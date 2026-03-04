@@ -1,0 +1,220 @@
+openapi: 3.1.0
+info:
+  title: KG Query API
+  description: 知识图谱查询服务，供 Coze 智能体调用，支持实体查询、邻居查询、路径发现和模糊搜索。
+  version: 1.0.0
+
+servers:
+  - url: https://your-deployed-domain.com
+    description: 生产服务器（替换为你的实际域名）
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+paths:
+
+  /query_entity:
+    post:
+      operationId: queryEntity
+      summary: 查询实体节点
+      description: 按实体名称查询知识图谱中的节点及其全部属性，支持精确和模糊匹配。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entity_name]
+              properties:
+                entity_name:
+                  type: string
+                  description: 要查询的实体名称，如"深度学习"、"注意力机制"
+                fuzzy:
+                  type: boolean
+                  default: false
+                  description: 是否开启模糊匹配，名称不确定时设为 true
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  found:
+                    type: boolean
+                  entities:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
+                  message:
+                    type: string
+
+  /query_neighbors:
+    post:
+      operationId: queryNeighbors
+      summary: 查询实体的 N 跳邻居
+      description: 查询指定实体在知识图谱中的邻居节点和关系，支持深度 1~3 跳，可按关系类型过滤。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entity_name]
+              properties:
+                entity_name:
+                  type: string
+                  description: 起始实体名称
+                depth:
+                  type: integer
+                  default: 1
+                  minimum: 1
+                  maximum: 3
+                  description: 查询深度，1=直接邻居，2=两跳，3=三跳
+                rel_type:
+                  type: string
+                  description: 关系类型过滤，如"包含"、"定义"、"属于"，不填则查所有关系
+                limit:
+                  type: integer
+                  default: 20
+                  maximum: 50
+                  description: 返回三元组数量上限
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  found:
+                    type: boolean
+                  triples:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
+
+  /find_path:
+    post:
+      operationId: findPath
+      summary: 查找两实体间最短路径
+      description: 查找知识图谱中两个实体之间的最短连接路径，用于多跳推理的路径展示。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [start_entity, end_entity]
+              properties:
+                start_entity:
+                  type: string
+                  description: 起始实体名称
+                end_entity:
+                  type: string
+                  description: 目标实体名称
+                max_hops:
+                  type: integer
+                  default: 4
+                  minimum: 1
+                  maximum: 6
+                  description: 允许的最大跳数
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  found:
+                    type: boolean
+                  paths:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        hops:
+                          type: integer
+                        readable:
+                          type: string
+                          description: 人类可读的路径，如"深度学习 → 包含 → Transformer → 使用 → 注意力机制"
+                        nodes:
+                          type: array
+                          items:
+                            type: object
+                        relationships:
+                          type: array
+                          items:
+                            type: object
+                  count:
+                    type: integer
+
+  /fuzzy_search:
+    post:
+      operationId: fuzzySearch
+      summary: 实体模糊搜索
+      description: 用关键词模糊搜索实体，用于实体消歧，当用户输入的名称不精确时获取候选列表。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keyword]
+              properties:
+                keyword:
+                  type: string
+                  description: 模糊搜索关键词
+                limit:
+                  type: integer
+                  default: 10
+                  maximum: 20
+                  description: 返回候选数量
+      responses:
+        "200":
+          description: 搜索成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  found:
+                    type: boolean
+                  candidates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        labels:
+                          type: array
+                          items:
+                            type: string
+                        definition:
+                          type: string
+                  count:
+                    type: integer
+
+  /health:
+    get:
+      operationId: healthCheck
+      summary: 服务健康检查
+      description: 检查服务和 Neo4j 连接状态
+      security: []
+      responses:
+        "200":
+          description: 状态正常
