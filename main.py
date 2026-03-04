@@ -108,6 +108,18 @@ class FuzzySearchRequest(BaseModel):
     keyword: str = Field(..., description="模糊搜索关键词")
     limit: int = Field(10, ge=1, le=20, description="返回候选数量")
 
+class DispatchRequest(BaseModel):
+    action: str = Field(..., description="操作名称：queryEntity | queryNeighbors | findPath | fuzzySearch")
+    entity_name: Optional[str] = Field(None, description="实体名称")
+    fuzzy: bool = Field(False, description="是否模糊匹配")
+    depth: int = Field(1, ge=1, le=3, description="查询深度")
+    rel_type: Optional[str] = Field(None, description="关系类型过滤")
+    limit: int = Field(20, ge=1, le=50, description="返回结果上限")
+    start_entity: Optional[str] = Field(None, description="findPath 起始实体")
+    end_entity: Optional[str] = Field(None, description="findPath 目标实体")
+    max_hops: int = Field(4, ge=1, le=6, description="findPath 最大跳数")
+    keyword: Optional[str] = Field(None, description="fuzzySearch 关键词")
+
 # ─────────────────────────────────────────
 # 工具函数：序列化 Neo4j 结果
 # ─────────────────────────────────────────
@@ -307,7 +319,46 @@ async def fuzzy_search(req: FuzzySearchRequest):
 
 
 # ─────────────────────────────────────────
-# ⑤ 接口：查询日志（演示用）
+# ⑤ 接口：统一分发（规避 Coze 并发分支限制）
+# ─────────────────────────────────────────
+
+@app.post("/dispatch", dependencies=[Depends(verify_api_key)])
+async def dispatch(req: DispatchRequest):
+    """
+    统一分发接口：Coze Workflow 用单个 Plugin Node 调此接口，
+    由后端按 action 字段路由，避免 Coze 并发分支嵌套限制。
+    """
+    if req.action == "queryEntity":
+        if not req.entity_name:
+            raise HTTPException(status_code=400, detail="queryEntity 需要 entity_name")
+        return await query_entity(QueryEntityRequest(entity_name=req.entity_name, fuzzy=req.fuzzy))
+
+    elif req.action == "queryNeighbors":
+        if not req.entity_name:
+            raise HTTPException(status_code=400, detail="queryNeighbors 需要 entity_name")
+        return await query_neighbors(QueryNeighborsRequest(
+            entity_name=req.entity_name, depth=req.depth,
+            rel_type=req.rel_type, limit=req.limit,
+        ))
+
+    elif req.action == "findPath":
+        if not req.start_entity or not req.end_entity:
+            raise HTTPException(status_code=400, detail="findPath 需要 start_entity 和 end_entity")
+        return await find_path(FindPathRequest(
+            start_entity=req.start_entity, end_entity=req.end_entity, max_hops=req.max_hops,
+        ))
+
+    elif req.action == "fuzzySearch":
+        if not req.keyword:
+            raise HTTPException(status_code=400, detail="fuzzySearch 需要 keyword")
+        return await fuzzy_search(FuzzySearchRequest(keyword=req.keyword, limit=req.limit))
+
+    else:
+        raise HTTPException(status_code=400, detail=f"未知 action: {req.action}")
+
+
+# ─────────────────────────────────────────
+# ⑥ 接口：查询日志（演示用）
 # ─────────────────────────────────────────
 
 @app.get("/logs", dependencies=[Depends(verify_api_key)])
