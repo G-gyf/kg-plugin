@@ -5,8 +5,8 @@ info:
   version: 1.0.0
 
 servers:
-  - url: https://your-deployed-domain.com
-    description: 生产服务器（替换为你的实际域名）
+  - url: https://kg-plugin-production.up.railway.app
+    description: 生产服务器
 
 security:
   - ApiKeyAuth: []
