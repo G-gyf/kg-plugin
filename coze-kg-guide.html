@@ -936,43 +936,55 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
         <tr><td>描述</td><td>接收自然语言问题，通过迭代查询 Neo4j 知识图谱实现多跳推理，返回结构化答案</td></tr>
       </table>
 
-      <p style="margin-top:12px;"><strong>Workflow 完整节点总览：</strong></p>
+      <p style="margin-top:12px;"><strong>Workflow 完整节点总览（最终实践版）：</strong></p>
       <div class="code-wrap" style="margin:10px 0;">
-        <div class="code-header"><span class="lang">FLOW</span><span class="fname">节点执行顺序</span></div>
-        <pre>开始(START)
+        <div class="code-header"><span class="lang">FLOW</span><span class="fname">主画布结构（循环节点实现多跳迭代）</span></div>
+        <pre>开始(START)  输入参数：user_query
   ↓
 ① 查询分析器 [LLM]
+  输出：start_entity、query_intent
   ↓
-   变量赋值：current_entity = start_entity
+  变量赋值（进循环前，初始化三个全局变量）
+  current_entity      = start_entity
+  query_intent_global = query_intent
+  user_query_global   = user_query
   ↓
-② Cypher生成器 [CODE]  ←─────────────────────────────────┐
-  ↓                                                        │ 循环
-   分流Branch [IF: plugin_action == "queryEntity"?]        │
-   ├─ Yes → Plugin A(queryEntity)                          │
-   │         → 序列化A [CODE]                              │
-   │         → 变量赋值：kg_result_global = kg_result      │
-   └─ No  → Plugin B(queryNeighbors)                       │
-             → 序列化B [CODE]                              │
-             → 变量赋值：kg_result_global = kg_result      │
-  ↓（两路汇合）                                            │
-④ 跳转评估器 [LLM]                                        │
-  ↓                                                        │
-⑤ 条件分支 [IF: should_continue=="true" && hop_count < max_hops]
-   ├─ True → 计算节点 [CODE: hop+1, 更新实体/上下文]       │
-   │          → 变量赋值（写回全局变量） ──────────────────┘
-   └─ False
-       ↓
+┌─ 循环节点（无限循环）─────────────────────────────────────┐
+│  [循环体内部]                                              │
+│  ② Cypher生成器 [CODE]                                    │
+│     读取全局：current_entity / hop_count                  │
+│              / query_intent_global                        │
+│     输出：action / entity_name / depth / limit / fuzzy    │
+│     ↓                                                     │
+│  ③ dispatch [PLUGIN]                                      │
+│     ↓                                                     │
+│  序列化 [CODE] → 变量赋值：kg_result_global = kg_result   │
+│     ↓                                                     │
+│  ④ 跳转评估器 [LLM]                                      │
+│     读取全局：user_query_global / context_graph           │
+│              / kg_result_global / hop_count / max_hops    │
+│     输出：should_continue / next_entity / updated_context │
+│     ↓                                                     │
+│  选择器节点 [IF]                                          │
+│  ├─ 继续 → ⑤-A 计算节点 [CODE]                          │
+│  │          → 变量赋值：更新 hop_count / current_entity   │
+│  │                      / context_graph（全局变量）       │
+│  │          [自动进入下一次循环迭代]                       │
+│  └─ 停止 → 终止循环节点                                  │
+└────────────────────────────────────────────────────────────┘
+  ↓ (循环结束后)
 ⑥ 答案合成器 [LLM]
+  读取全局：user_query_global / context_graph / hop_count
   ↓
 结束(END)</pre>
       </div>
-      <div class="callout tip">
-        <div class="icon">🔄</div>
-        <div class="body"><strong>循环连线：</strong>分支 True 路径末尾的变量赋值节点 → 连回「Cypher生成」节点，形成多跳迭代循环。Coze 支持向前连线。</div>
-      </div>
-      <div class="callout warn">
-        <div class="icon">⚠️</div>
-        <div class="body"><strong>Coze Plugin Node 限制：</strong>不支持动态切换操作名，因此需要为每个插件操作建一个独立 Plugin Node，通过前置 Branch 节点按 <code>plugin_action</code> 分流。</div>
+      <div class="callout" style="background:#122016;border-left:3px solid var(--green);">
+        <div class="icon">✅</div>
+        <div class="body">
+          <strong>两个关键设计决策（实践验证）：</strong><br><br>
+          <strong>① /dispatch 统一接口</strong>：后端新增此接口，Workflow 只用一个 Plugin Node，传 <code>action</code> 字段由服务端路由查询逻辑，彻底消灭分流 Branch。原方案「分流 Branch → Plugin A/B → 汇合」会触发 Coze「并发分支出线不允许进入另一个并发分支」限制。<br><br>
+          <strong>② 循环节点（无限循环）</strong>：Coze 不支持在主画布直接绘制回环连线（报错「不允许成环」），必须使用内置「循环节点」实现迭代。循环体内可自由读写全局变量，循环节点本身无需配置中间变量，用「终止循环节点」控制退出。
+        </div>
       </div>
     </div>
   </div>
@@ -1000,10 +1012,11 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
             <tr><th>变量名</th><th>类型</th><th>默认值</th><th>用途</th></tr>
             <tr><td><code>hop_count</code></td><td>Integer</td><td><code>0</code></td><td>当前已跳次数</td></tr>
             <tr><td><code>max_hops</code></td><td>Integer</td><td><code>3</code></td><td>最大允许跳数</td></tr>
-            <tr><td><code>context_graph</code></td><td>String</td><td><code>""</code></td><td>累积的子图摘要字符串</td></tr>
             <tr><td><code>current_entity</code></td><td>String</td><td><code>""</code></td><td>当前要查询的实体名</td></tr>
-            <tr><td><code>found_answer</code></td><td>Boolean</td><td><code>false</code></td><td>是否已找到答案</td></tr>
-            <tr><td><code>kg_result_global</code></td><td>String</td><td><code>""</code></td><td>Plugin查询结果（两条分支共享写入）</td></tr>
+            <tr><td><code>context_graph</code></td><td>String</td><td><code>""</code></td><td>累积的推理上下文摘要</td></tr>
+            <tr><td><code>kg_result_global</code></td><td>String</td><td><code>""</code></td><td>每跳 dispatch 查询结果（JSON字符串）</td></tr>
+            <tr><td><code>query_intent_global</code></td><td>String</td><td><code>""</code></td><td>查询意图，循环体内 Cypher 生成器读取</td></tr>
+            <tr><td><code>user_query_global</code></td><td>String</td><td><code>""</code></td><td>原始问题，循环体内 LLM 节点读取</td></tr>
           </table>
         </div>
       </div>
@@ -1028,150 +1041,122 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
         </div></div>
       </div>
 
-      <!-- 变量赋值：初始化 current_entity -->
+      <!-- 变量赋值：进循环前初始化 -->
       <div class="node-config" style="margin-bottom:14px;">
-        <div class="nc-header" style="color:var(--text-mid);">📝 变量赋值节点（初始化 current_entity）</div>
-        <div class="nc-row"><div class="nc-key">作用</div><div class="nc-val">把查询分析器识别出的起始实体写入全局变量，后续循环才能正确更新</div></div>
+        <div class="nc-header" style="color:var(--text-mid);">📝 变量赋值节点（进循环前，初始化全局变量）</div>
+        <div class="nc-row"><div class="nc-key">作用</div><div class="nc-val">循环体内部无法直接引用循环外节点的输出，必须先把关键值写入全局变量，循环体内再读取</div></div>
         <div style="margin-top:6px;">
           <table>
-            <tr><th>目标全局变量</th><th>值（引用上一节点输出）</th></tr>
-            <tr><td><code>current_entity</code></td><td><code>start_entity</code></td></tr>
+            <tr><th>目标全局变量</th><th>值（引用节点①输出）</th></tr>
+            <tr><td><code>current_entity</code></td><td>节点①输出 <code>start_entity</code></td></tr>
+            <tr><td><code>query_intent_global</code></td><td>节点①输出 <code>query_intent</code></td></tr>
+            <tr><td><code>user_query_global</code></td><td>开始节点输入参数 <code>user_query</code></td></tr>
           </table>
         </div>
         <div class="callout info" style="margin-top:8px;">
           <div class="icon">ℹ️</div>
-          <div class="body">Coze 变量赋值节点只支持「变量引用」或「字面量」，<strong>不支持表达式运算</strong>（如 hop_count + 1）。需要运算时必须先用 Code Node 计算，再用变量赋值写回。</div>
+          <div class="body">变量赋值节点只支持「变量引用」或「字面量」，<strong>不支持表达式运算</strong>（如 hop_count + 1）。需要运算时先用 Code Node 计算，再用变量赋值写回。</div>
         </div>
       </div>
 
-      <!-- Node 2: Cypher 生成 -->
+      <!-- 循环节点 -->
       <div class="node-config" style="margin-bottom:14px;">
-        <div class="nc-header" style="color:var(--green);">⚡ 节点②：Cypher 生成器（Code Node）</div>
+        <div class="nc-header" style="color:var(--orange);">🔁 循环节点配置</div>
+        <div class="nc-row"><div class="nc-key">循环模式</div><div class="nc-val"><strong>无限循环</strong>（由循环体内的「终止循环节点」控制退出）</div></div>
+        <div class="nc-row"><div class="nc-key">中间变量</div><div class="nc-val">不需要配置（状态完全通过全局变量传递）</div></div>
+        <div class="callout info" style="margin-top:8px;">
+          <div class="icon">ℹ️</div>
+          <div class="body">Coze 不支持在主画布绘制回环连线（报错「不允许成环」）。<strong>必须使用循环节点</strong>实现迭代，不能直接拖线从下游节点连回上游节点。</div>
+        </div>
+      </div>
+
+      <p style="font-size:12px;font-weight:700;color:var(--text);margin:16px 0 8px;">── 以下为循环体内部节点 ──</p>
+
+      <!-- Node 2: Cypher 生成（循环体内） -->
+      <div class="node-config" style="margin-bottom:14px;">
+        <div class="nc-header" style="color:var(--green);">⚡ 节点②：Cypher 生成器（Code Node，循环体内）</div>
         <div class="nc-row"><div class="nc-key">语言</div><div class="nc-val">Python</div></div>
-        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val"><code>current_entity</code>（全局变量）、<code>hop_count</code>（全局变量）、<code>query_intent</code>（节点①输出）</div></div>
-        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>plugin_action</code>（String）、<code>plugin_params</code>（String，备用）</div></div>
+        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val">全局变量 <code>current_entity</code>、<code>hop_count</code>、<code>query_intent_global</code></div></div>
+        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>action</code>（String）、<code>entity_name</code>（String）、<code>depth</code>（Integer）、<code>limit</code>（Integer）、<code>fuzzy</code>（Boolean）</div></div>
         <div class="nc-row"><div class="nc-key">代码</div><div class="nc-val">
           <div class="code-wrap" style="margin:0;">
             <div class="code-header"><span class="lang">PYTHON</span></div>
-            <pre><span class="kw">import</span> json
-
-<span class="kw">def</span> <span class="fn">main</span>(current_entity: str, hop_count: int, query_intent: str) -> dict:
-    <span class="kw">if</span> query_intent == <span class="str">"path_finding"</span>:
+            <pre><span class="kw">def</span> <span class="fn">main</span>(current_entity: str, hop_count: int, query_intent_global: str) -> dict:
+    <span class="kw">if</span> query_intent_global == <span class="str">"path_finding"</span>:
         action = <span class="str">"queryNeighbors"</span>
-        params = {<span class="str">"entity_name"</span>: current_entity, <span class="str">"depth"</span>: <span class="num">2</span>, <span class="str">"limit"</span>: <span class="num">15</span>}
+        depth = <span class="num">2</span>
+        limit = <span class="num">15</span>
     <span class="kw">elif</span> hop_count == <span class="num">0</span>:
         <span class="cmt"># 第一跳：先查实体本身</span>
         action = <span class="str">"queryEntity"</span>
-        params = {<span class="str">"entity_name"</span>: current_entity, <span class="str">"fuzzy"</span>: <span class="kw">False</span>}
+        depth = <span class="num">1</span>
+        limit = <span class="num">10</span>
     <span class="kw">else</span>:
         <span class="cmt"># 后续跳：查邻居</span>
         action = <span class="str">"queryNeighbors"</span>
-        params = {<span class="str">"entity_name"</span>: current_entity, <span class="str">"depth"</span>: <span class="num">1</span>, <span class="str">"limit"</span>: <span class="num">20</span>}
+        depth = <span class="num">1</span>
+        limit = <span class="num">20</span>
 
     <span class="kw">return</span> {
-        <span class="str">"plugin_action"</span>: action,
-        <span class="str">"plugin_params"</span>: json.dumps(params, ensure_ascii=<span class="kw">False</span>)
+        <span class="str">"action"</span>: action,
+        <span class="str">"entity_name"</span>: current_entity,
+        <span class="str">"depth"</span>: depth,
+        <span class="str">"limit"</span>: limit,
+        <span class="str">"fuzzy"</span>: <span class="kw">False</span>
     }</pre>
           </div>
         </div></div>
       </div>
 
-      <!-- Branch: 分流 -->
+      <!-- Node 3: dispatch Plugin（循环体内） -->
+      <div class="node-config" style="margin-bottom:6px;">
+        <div class="nc-header" style="color:var(--cyan);">🔌 节点③：dispatch Plugin Node（循环体内）</div>
+        <div class="nc-row"><div class="nc-key">插件 / 操作</div><div class="nc-val">「KG查询服务」→ <strong>dispatch</strong></div></div>
+        <div class="nc-row"><div class="nc-key">参数映射</div><div class="nc-val">
+          <table style="margin:0;">
+            <tr><th>参数名</th><th>来源</th></tr>
+            <tr><td><code>action</code></td><td>引用节点② 输出 <code>action</code></td></tr>
+            <tr><td><code>entity_name</code></td><td>引用节点② 输出 <code>entity_name</code></td></tr>
+            <tr><td><code>depth</code></td><td>引用节点② 输出 <code>depth</code></td></tr>
+            <tr><td><code>limit</code></td><td>引用节点② 输出 <code>limit</code></td></tr>
+            <tr><td><code>fuzzy</code></td><td>引用节点② 输出 <code>fuzzy</code></td></tr>
+          </table>
+        </div></div>
+      </div>
+
+      <!-- 序列化 Code Node（循环体内） -->
       <div class="node-config" style="margin-bottom:14px;">
-        <div class="nc-header" style="color:var(--pink);">🔀 分流 Branch（IF Node）：按 plugin_action 分支</div>
-        <div class="nc-row"><div class="nc-key">分支 A</div><div class="nc-val"><code>plugin_action == "queryEntity"</code> → 走 Plugin Node A 路径</div></div>
-        <div class="nc-row"><div class="nc-key">分支 B（else）</div><div class="nc-val">其余情况 → 走 Plugin Node B（queryNeighbors）路径</div></div>
-      </div>
-
-      <!-- Node 3A: queryEntity 路径 -->
-      <div class="node-config" style="margin-bottom:6px;border-left:3px solid var(--blue);">
-        <div class="nc-header" style="color:var(--orange);">🔌 分支A · Plugin Node A（queryEntity）</div>
-        <div class="nc-row"><div class="nc-key">插件</div><div class="nc-val">选择「KG查询服务」→ 操作选 <strong>queryEntity</strong></div></div>
-        <div class="nc-row"><div class="nc-key">参数映射</div><div class="nc-val">
-          <table style="margin:0;">
-            <tr><th>参数名</th><th>填写方式</th></tr>
-            <tr><td><code>entity_name</code></td><td>点击引用变量，选全局变量 <code>current_entity</code></td></tr>
-            <tr><td><code>fuzzy</code></td><td>直接填字面量 <code>false</code></td></tr>
-          </table>
-        </div></div>
-        <div class="nc-row"><div class="nc-key">实际输出字段</div><div class="nc-val"><code>message</code>（String）、<code>count</code>（Integer）、<code>found</code>（Boolean）、<code>entities</code>（Array）</div></div>
-      </div>
-
-      <div class="node-config" style="margin-bottom:14px;border-left:3px solid var(--blue);">
-        <div class="nc-header" style="color:var(--green);">⚡ 分支A · 序列化 Code Node A</div>
-        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val">引用 Plugin Node A 的输出：<code>found</code>、<code>entities</code>、<code>count</code>、<code>message</code></div></div>
+        <div class="nc-header" style="color:var(--green);">⚡ 序列化 Code Node（循环体内，紧接 dispatch 后）</div>
+        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val">引用 dispatch 输出字段，不存在的给默认值：<code>found</code>、<code>count</code>、<code>message</code>、<code>entities</code>、<code>triples</code>、<code>source_entity</code></div></div>
         <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>kg_result</code>（String）</div></div>
         <div class="nc-row"><div class="nc-key">代码</div><div class="nc-val">
           <div class="code-wrap" style="margin:0;">
             <div class="code-header"><span class="lang">PYTHON</span></div>
             <pre><span class="kw">import</span> json
 
-<span class="kw">def</span> <span class="fn">main</span>(found: bool, entities: list, count: int, message: str = <span class="str">""</span>) -> dict:
+<span class="kw">def</span> <span class="fn">main</span>(found: bool = <span class="kw">False</span>, count: int = <span class="num">0</span>,
+         entities: list = [], triples: list = [],
+         message: str = <span class="str">""</span>, source_entity: str = <span class="str">""</span>) -> dict:
     result = {
-        <span class="str">"found"</span>: found,
-        <span class="str">"count"</span>: count,
-        <span class="str">"message"</span>: message,
-        <span class="str">"entities"</span>: entities
-    }
-    <span class="kw">return</span> {<span class="str">"kg_result"</span>: json.dumps(result, ensure_ascii=<span class="kw">False</span>)}</pre>
-          </div>
-        </div></div>
-        <div class="nc-row"><div class="nc-key">变量赋值</div><div class="nc-val">紧接此节点后加变量赋值节点：<code>kg_result_global</code> = <code>kg_result</code>（引用本节点输出）</div></div>
-      </div>
-
-      <!-- Node 3B: queryNeighbors 路径 -->
-      <div class="node-config" style="margin-bottom:6px;border-left:3px solid var(--green);">
-        <div class="nc-header" style="color:var(--orange);">🔌 分支B · Plugin Node B（queryNeighbors）</div>
-        <div class="nc-row"><div class="nc-key">插件</div><div class="nc-val">选择「KG查询服务」→ 操作选 <strong>queryNeighbors</strong></div></div>
-        <div class="nc-row"><div class="nc-key">参数映射</div><div class="nc-val">
-          <table style="margin:0;">
-            <tr><th>参数名</th><th>填写方式</th></tr>
-            <tr><td><code>entity_name</code></td><td>引用全局变量 <code>current_entity</code></td></tr>
-            <tr><td><code>depth</code></td><td>填字面量 <code>1</code></td></tr>
-            <tr><td><code>limit</code></td><td>填字面量 <code>20</code></td></tr>
-          </table>
-        </div></div>
-        <div class="nc-row"><div class="nc-key">实际输出字段</div><div class="nc-val"><code>count</code>（Integer）、<code>depth</code>（Integer）、<code>found</code>（Boolean）、<code>source_entity</code>（String）、<code>triples</code>（Array — 每项含 start/relationship/end 嵌套对象）</div></div>
-      </div>
-
-      <div class="node-config" style="margin-bottom:14px;border-left:3px solid var(--green);">
-        <div class="nc-header" style="color:var(--green);">⚡ 分支B · 序列化 Code Node B</div>
-        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val">引用 Plugin Node B 的输出：<code>found</code>、<code>source_entity</code>、<code>triples</code>、<code>count</code>、<code>depth</code></div></div>
-        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>kg_result</code>（String）</div></div>
-        <div class="nc-row"><div class="nc-key">代码</div><div class="nc-val">
-          <div class="code-wrap" style="margin:0;">
-            <div class="code-header"><span class="lang">PYTHON</span></div>
-            <pre><span class="kw">import</span> json
-
-<span class="kw">def</span> <span class="fn">main</span>(found: bool, source_entity: str, triples: list,
-         count: int, depth: int = <span class="num">0</span>) -> dict:
-    result = {
-        <span class="str">"found"</span>: found,
+        <span class="str">"found"</span>: found, <span class="str">"count"</span>: count, <span class="str">"message"</span>: message,
+        <span class="str">"entities"</span>: entities, <span class="str">"triples"</span>: triples,
         <span class="str">"source_entity"</span>: source_entity,
-        <span class="str">"count"</span>: count,
-        <span class="str">"depth"</span>: depth,
-        <span class="str">"triples"</span>: triples   <span class="cmt"># json.dumps 自动递归序列化嵌套对象</span>
     }
     <span class="kw">return</span> {<span class="str">"kg_result"</span>: json.dumps(result, ensure_ascii=<span class="kw">False</span>)}</pre>
           </div>
         </div></div>
-        <div class="nc-row"><div class="nc-key">变量赋值</div><div class="nc-val">紧接此节点后加变量赋值节点：<code>kg_result_global</code> = <code>kg_result</code>（引用本节点输出）</div></div>
+        <div class="nc-row"><div class="nc-key">变量赋值</div><div class="nc-val">此节点后加变量赋值：<code>kg_result_global</code> = 本节点输出 <code>kg_result</code></div></div>
       </div>
 
-      <div class="callout tip" style="margin-bottom:14px;">
-        <div class="icon">💡</div>
-        <div class="body"><strong>为什么需要 kg_result_global？</strong>两条分支各自的 Code Node 输出变量名虽然相同（都叫 kg_result），但属于不同节点的局部输出，下游节点无法同时引用两者。通过在每条分支末尾写入同一个全局变量 <code>kg_result_global</code>，下游统一引用该全局变量即可，不管走哪条分支都能取到值。</div>
-      </div>
-
-      <!-- Node 4: 跳转评估 -->
+      <!-- Node 4: 跳转评估（循环体内） -->
       <div class="node-config" style="margin-bottom:14px;">
-        <div class="nc-header" style="color:var(--blue);">🧠 节点④：跳转评估器（LLM Node）</div>
-        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val"><code>user_query</code>（开始节点输入）、<code>context_graph</code>（全局变量）、<code>kg_result_global</code>（全局变量）、<code>hop_count</code>（全局变量）、<code>max_hops</code>（全局变量）</div></div>
-        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>should_continue</code>（String: "true"/"false"）、<code>next_entity</code>（String）、<code>updated_context</code>（String）</div></div>
+        <div class="nc-header" style="color:var(--blue);">🧠 节点④：跳转评估器（LLM Node，循环体内）</div>
+        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val">全局变量 <code>user_query_global</code>、<code>context_graph</code>、<code>kg_result_global</code>、<code>hop_count</code>、<code>max_hops</code></div></div>
+        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>should_continue</code>（String）、<code>next_entity</code>（String）、<code>updated_context</code>（String）</div></div>
         <div class="nc-row"><div class="nc-key">Prompt</div><div class="nc-val">
           <div class="prompt-box" style="font-size:10px;">你是推理评估专家。判断是否需要继续查询知识图谱。
 
-原始问题：{{user_query}}
+原始问题：{{user_query_global}}
 已查询跳数：{{hop_count}} / {{max_hops}}
 已收集信息：{{context_graph}}
 本次查询结果：{{kg_result_global}}
@@ -1190,21 +1175,17 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
         </div></div>
       </div>
 
-      <!-- Node 5: 条件分支 -->
+      <!-- 选择器节点（循环体内） -->
       <div class="node-config" style="margin-bottom:14px;">
-        <div class="nc-header" style="color:var(--pink);">🔀 节点⑤：条件分支（IF Node）</div>
-        <div class="nc-row"><div class="nc-key">条件 A（True）</div><div class="nc-val"><code>should_continue == "true"</code> <strong>且</strong> <code>hop_count &lt; max_hops</code></div></div>
-        <div class="nc-row"><div class="nc-key">条件 B（else）</div><div class="nc-val">→ 直接连到「答案合成」节点</div></div>
-        <div class="callout warn" style="margin-top:8px;">
-          <div class="icon">⚠️</div>
-          <div class="body"><strong>不要在条件分支的连线上设置变量赋值</strong>，Coze 变量赋值不支持表达式运算。分支 True 路径需要先经过「计算 Code Node」再做赋值（见下方节点⑤-A）。</div>
-        </div>
+        <div class="nc-header" style="color:var(--pink);">🔀 选择器节点（IF，循环体内）</div>
+        <div class="nc-row"><div class="nc-key">条件（继续）</div><div class="nc-val"><code>should_continue == "true"</code> 且 <code>hop_count &lt; max_hops</code> → 走「计算节点」</div></div>
+        <div class="nc-row"><div class="nc-key">否则（停止）</div><div class="nc-val">→ 走「终止循环节点」，退出循环</div></div>
       </div>
 
-      <!-- Node 5A: 计算节点（True 分支） -->
+      <!-- Node 5A: 计算节点（选择器继续分支） -->
       <div class="node-config" style="margin-bottom:14px;border-left:3px solid var(--pink);">
-        <div class="nc-header" style="color:var(--green);">⚡ 节点⑤-A：循环计算节点（Code Node，仅在 True 分支上）</div>
-        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val"><code>hop_count</code>（全局变量）、<code>next_entity</code>（节点④输出）、<code>updated_context</code>（节点④输出）</div></div>
+        <div class="nc-header" style="color:var(--green);">⚡ 节点⑤-A：计算节点（Code Node，选择器「继续」分支）</div>
+        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val">全局变量 <code>hop_count</code>；节点④输出 <code>next_entity</code>、<code>updated_context</code></div></div>
         <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>new_hop_count</code>（Integer）、<code>new_entity</code>（String）、<code>new_context</code>（String）</div></div>
         <div class="nc-row"><div class="nc-key">代码</div><div class="nc-val">
           <div class="code-wrap" style="margin:0;">
@@ -1224,9 +1205,18 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
             <tr><td><code>current_entity</code></td><td><code>new_entity</code></td></tr>
             <tr><td><code>context_graph</code></td><td><code>new_context</code></td></tr>
           </table>
+          变量赋值完成后 → 自动进入下一次循环迭代（无需额外连线）
         </div></div>
-        <div class="nc-row"><div class="nc-key">连线</div><div class="nc-val">变量赋值节点完成后 → <strong>连回节点②（Cypher生成器）</strong>，形成循环</div></div>
       </div>
+
+      <!-- 终止循环节点 -->
+      <div class="node-config" style="margin-bottom:14px;">
+        <div class="nc-header" style="color:var(--red);">⏹ 终止循环节点（选择器「停止」分支末尾）</div>
+        <div class="nc-row"><div class="nc-key">作用</div><div class="nc-val">退出无限循环，流程回到主画布，继续执行循环节点之后的节点⑥</div></div>
+        <div class="nc-row"><div class="nc-key">配置</div><div class="nc-val">无需额外配置，直接放在选择器「停止」路径末尾即可</div></div>
+      </div>
+
+      <p style="font-size:12px;font-weight:700;color:var(--text);margin:16px 0 8px;">── 以下为循环结束后的主画布节点 ──</p>
 
       <!-- Node 6: 答案合成 -->
       <div class="node-config">
@@ -1262,23 +1252,19 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
   <div class="step">
     <div class="step-body" style="margin-left:0;">
       <table>
-        <tr><th>从</th><th>到</th><th>备注</th></tr>
-        <tr><td>开始</td><td>节点① 查询分析器</td><td>直连</td></tr>
-        <tr><td>节点① 查询分析器</td><td>变量赋值（current_entity = start_entity）</td><td>初始化起始实体</td></tr>
-        <tr><td>变量赋值</td><td>节点② Cypher生成器</td><td>直连</td></tr>
-        <tr><td>节点② Cypher生成器</td><td>分流 Branch</td><td>直连</td></tr>
-        <tr><td>分流 Branch · 分支A</td><td>Plugin Node A（queryEntity）</td><td>条件：plugin_action == "queryEntity"</td></tr>
-        <tr><td>Plugin Node A</td><td>序列化 Code Node A</td><td>直连</td></tr>
-        <tr><td>序列化 Code Node A</td><td>变量赋值（kg_result_global = kg_result）</td><td>写入共享全局变量</td></tr>
-        <tr><td>分流 Branch · 分支B</td><td>Plugin Node B（queryNeighbors）</td><td>条件：else</td></tr>
-        <tr><td>Plugin Node B</td><td>序列化 Code Node B</td><td>直连</td></tr>
-        <tr><td>序列化 Code Node B</td><td>变量赋值（kg_result_global = kg_result）</td><td>写入共享全局变量</td></tr>
-        <tr><td>两路变量赋值（汇合）</td><td>节点④ 跳转评估器</td><td>两条线都连到此节点</td></tr>
-        <tr><td>节点④ 跳转评估器</td><td>节点⑤ 条件分支</td><td>直连</td></tr>
-        <tr><td>节点⑤ · True 分支</td><td>节点⑤-A 计算 Code Node</td><td>条件：should_continue=="true" 且 hop_count &lt; max_hops</td></tr>
-        <tr><td>节点⑤-A 计算 Code Node</td><td>变量赋值（写回 hop_count / current_entity / context_graph）</td><td>三个全局变量一次性更新</td></tr>
-        <tr><td>变量赋值（回环）</td><td>节点② Cypher生成器</td><td>⚠️ 形成循环，Coze 支持向前连线</td></tr>
-        <tr><td>节点⑤ · False 分支</td><td>节点⑥ 答案合成器</td><td>直连</td></tr>
+        <tr><th>位置</th><th>从</th><th>到</th><th>备注</th></tr>
+        <tr><td rowspan="3" style="color:var(--text);font-weight:600;">主画布</td><td>开始</td><td>节点① 查询分析器</td><td>直连</td></tr>
+        <tr><td>节点① 查询分析器</td><td>变量赋值（初始化3个全局变量）</td><td>current_entity / query_intent_global / user_query_global</td></tr>
+        <tr><td>变量赋值</td><td>循环节点</td><td>直连，进入无限循环</td></tr>
+        <tr><td rowspan="8" style="color:var(--cyan);font-weight:600;">循环体内</td><td>节点② Cypher生成器</td><td>节点③ dispatch Plugin</td><td>直连</td></tr>
+        <tr><td>节点③ dispatch</td><td>序列化 Code Node</td><td>直连</td></tr>
+        <tr><td>序列化 Code Node</td><td>变量赋值（kg_result_global）</td><td>写入全局变量</td></tr>
+        <tr><td>变量赋值</td><td>节点④ 跳转评估器</td><td>直连</td></tr>
+        <tr><td>节点④ 跳转评估器</td><td>选择器节点</td><td>直连</td></tr>
+        <tr><td>选择器 · 继续分支</td><td>节点⑤-A 计算节点</td><td>条件：should_continue=="true" 且 hop_count &lt; max_hops</td></tr>
+        <tr><td>节点⑤-A → 变量赋值</td><td>[下一轮迭代自动开始]</td><td>更新 hop_count / current_entity / context_graph</td></tr>
+        <tr><td>选择器 · 停止分支</td><td>终止循环节点</td><td>退出循环，回到主画布</td></tr>
+        <tr><td rowspan="2" style="color:var(--text);font-weight:600;">主画布</td><td>循环节点（结束后）</td><td>节点⑥ 答案合成器</td><td>直连</td></tr>
         <tr><td>节点⑥ 答案合成器</td><td>结束</td><td>输出 final_answer</td></tr>
       </table>
     </div>
