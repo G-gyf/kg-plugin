@@ -327,16 +327,18 @@ async def dispatch(req: DispatchRequest):
     """
     统一分发接口：Coze Workflow 用单个 Plugin Node 调此接口，
     由后端按 action 字段路由，避免 Coze 并发分支嵌套限制。
+    额外返回 result_json 字段（整个结果的 JSON 字符串），
+    供 Coze Code Node 直接使用，绕过 Coze 不能正确传递嵌套对象数组的问题。
     """
     if req.action == "queryEntity":
         if not req.entity_name:
             raise HTTPException(status_code=400, detail="queryEntity 需要 entity_name")
-        return await query_entity(QueryEntityRequest(entity_name=req.entity_name, fuzzy=req.fuzzy))
+        result = await query_entity(QueryEntityRequest(entity_name=req.entity_name, fuzzy=req.fuzzy))
 
     elif req.action == "queryNeighbors":
         if not req.entity_name:
             raise HTTPException(status_code=400, detail="queryNeighbors 需要 entity_name")
-        return await query_neighbors(QueryNeighborsRequest(
+        result = await query_neighbors(QueryNeighborsRequest(
             entity_name=req.entity_name, depth=req.depth,
             rel_type=req.rel_type, limit=req.limit,
         ))
@@ -344,17 +346,20 @@ async def dispatch(req: DispatchRequest):
     elif req.action == "findPath":
         if not req.start_entity or not req.end_entity:
             raise HTTPException(status_code=400, detail="findPath 需要 start_entity 和 end_entity")
-        return await find_path(FindPathRequest(
+        result = await find_path(FindPathRequest(
             start_entity=req.start_entity, end_entity=req.end_entity, max_hops=req.max_hops,
         ))
 
     elif req.action == "fuzzySearch":
         if not req.keyword:
             raise HTTPException(status_code=400, detail="fuzzySearch 需要 keyword")
-        return await fuzzy_search(FuzzySearchRequest(keyword=req.keyword, limit=req.limit))
+        result = await fuzzy_search(FuzzySearchRequest(keyword=req.keyword, limit=req.limit))
 
     else:
         raise HTTPException(status_code=400, detail=f"未知 action: {req.action}")
+
+    result["result_json"] = json.dumps(result, ensure_ascii=False)
+    return result
 
 
 # ─────────────────────────────────────────

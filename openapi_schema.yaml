@@ -394,6 +394,9 @@ paths:
                   source_entity:
                     type: string
                     description: 查询的源实体名称
+                  result_json:
+                    type: string
+                    description: 完整结果的 JSON 字符串（包含 entities/triples 完整数据），供 Code Node 直接使用
 
   /health:
     get:
