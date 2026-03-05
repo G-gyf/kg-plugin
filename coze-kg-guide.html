@@ -1056,7 +1056,12 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
         <div class="callout info" style="margin-top:8px;">
           <div class="icon">ℹ️</div>
           <div class="body">变量赋值节点只支持「变量引用」或「字面量」，<strong>不支持表达式运算</strong>（如 hop_count + 1）。需要运算时先用 Code Node 计算，再用变量赋值写回。<br><br>
-          <strong>Code Node 书写规则：</strong>① 函数定义必须用 <code>async def</code>；② 所有参数必须给默认值（如 <code>hop_count: int = 0</code>）；③ 类型注解冒号后必须有一个空格（如 <code>str = ""</code>，不能写 <code>str=""</code>）。</div>
+          <strong>Code Node 书写规则：</strong><br>
+          ① 函数定义必须用 <code>async def</code>；<br>
+          ② 所有参数必须给默认值（如 <code>hop_count: int = 0</code>）；<br>
+          ③ 类型注解冒号后必须有一个空格（如 <code>str = ""</code>，不能写 <code>str=""</code>）；<br>
+          ④ <strong>不能输出 bool 类型</strong>——返回 <code>True/False</code> 会报 <code>Output contain unknown value type</code>，需改用 <code>0/1</code> 或直接在下游节点填字面量；<br>
+          ⑤ <strong>循环体内读取应用变量（应用变量）可能被打包成 <code>{"params":{...}}</code> 传给第一个参数</strong>，需在函数开头用 <code>json</code>/<code>ast.literal_eval</code> 解包；对 Integer 类型应用变量还可能以 <code>Args</code> 对象传入（支持 <code>==</code> 比较，不支持算术），用 <code>int()</code> 转换或等值比较循环提取真实值。</div>
         </div>
       </div>
 
@@ -1078,11 +1083,39 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
         <div class="nc-header" style="color:var(--green);">⚡ 节点②：Cypher 生成器（Code Node，循环体内）</div>
         <div class="nc-row"><div class="nc-key">语言</div><div class="nc-val">Python</div></div>
         <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val">全局变量 <code>current_entity</code>、<code>hop_count</code>、<code>query_intent_global</code></div></div>
-        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>action</code>（String）、<code>entity_name</code>（String）、<code>depth</code>（Integer）、<code>limit</code>（Integer）、<code>fuzzy</code>（Boolean）</div></div>
+        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>action</code>（String）、<code>entity_name</code>（String）、<code>depth</code>（Integer）、<code>limit</code>（Integer）<br><span style="color:var(--orange);font-size:10px;">⚠ 不输出 fuzzy —— Coze Code Node 不支持 bool 类型输出，fuzzy 在 dispatch 节点直接填字面量 false</span></div></div>
         <div class="nc-row"><div class="nc-key">代码</div><div class="nc-val">
           <div class="code-wrap" style="margin:0;">
             <div class="code-header"><span class="lang">PYTHON</span></div>
-            <pre><span class="kw">async def</span> <span class="fn">main</span>(current_entity: str = <span class="str">""</span>, hop_count: int = <span class="num">0</span>, query_intent_global: str = <span class="str">""</span>) -> dict:
+            <pre><span class="kw">import</span> json
+<span class="kw">import</span> ast
+
+<span class="kw">async def</span> <span class="fn">main</span>(current_entity: str = <span class="str">""</span>, hop_count: int = <span class="num">0</span>, query_intent_global: str = <span class="str">""</span>) -> dict:
+    <span class="cmt"># Coze 循环体内读取应用变量时会打包成 {"params":{...}} 传给第一个参数，需解包</span>
+    p = <span class="kw">None</span>
+    <span class="kw">if</span> <span class="fn">isinstance</span>(current_entity, dict):
+        p = current_entity.get(<span class="str">"params"</span>, current_entity)
+    <span class="kw">elif</span> <span class="fn">isinstance</span>(current_entity, str) <span class="kw">and</span> current_entity.strip().startswith(<span class="str">'{'</span>):
+        s = current_entity.strip()
+        <span class="kw">try</span>:
+            d = json.loads(s)
+            <span class="kw">if</span> <span class="fn">isinstance</span>(d, dict):
+                p = d.get(<span class="str">"params"</span>, d)
+        <span class="kw">except</span> Exception:
+            <span class="kw">pass</span>
+        <span class="kw">if</span> p <span class="kw">is None</span>:
+            <span class="kw">try</span>:
+                d = ast.literal_eval(s)
+                <span class="kw">if</span> <span class="fn">isinstance</span>(d, dict):
+                    p = d.get(<span class="str">"params"</span>, d)
+            <span class="kw">except</span> Exception:
+                <span class="kw">pass</span>
+
+    <span class="kw">if</span> p <span class="kw">and</span> <span class="fn">isinstance</span>(p, dict) <span class="kw">and</span> <span class="str">"current_entity"</span> <span class="kw">in</span> p:
+        current_entity      = <span class="fn">str</span>(p.get(<span class="str">"current_entity"</span>, <span class="str">""</span>))
+        hop_count           = <span class="fn">int</span>(p.get(<span class="str">"hop_count"</span>, <span class="num">0</span>))
+        query_intent_global = <span class="fn">str</span>(p.get(<span class="str">"query_intent_global"</span>, <span class="str">""</span>))
+
     <span class="kw">if</span> query_intent_global == <span class="str">"path_finding"</span>:
         action = <span class="str">"queryNeighbors"</span>
         depth = <span class="num">2</span>
@@ -1102,8 +1135,7 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
         <span class="str">"action"</span>: action,
         <span class="str">"entity_name"</span>: current_entity,
         <span class="str">"depth"</span>: depth,
-        <span class="str">"limit"</span>: limit,
-        <span class="str">"fuzzy"</span>: <span class="kw">False</span>
+        <span class="str">"limit"</span>: limit
     }</pre>
           </div>
         </div></div>
@@ -1120,7 +1152,7 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
             <tr><td><code>entity_name</code></td><td>引用节点② 输出 <code>entity_name</code></td></tr>
             <tr><td><code>depth</code></td><td>引用节点② 输出 <code>depth</code></td></tr>
             <tr><td><code>limit</code></td><td>引用节点② 输出 <code>limit</code></td></tr>
-            <tr><td><code>fuzzy</code></td><td>引用节点② 输出 <code>fuzzy</code></td></tr>
+            <tr><td><code>fuzzy</code></td><td><strong>手动输入字面量</strong> <code>false</code>（不引用节点②，Coze Code Node 不支持 bool 输出）</td></tr>
           </table>
         </div></div>
       </div>
@@ -1181,6 +1213,10 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
         <div class="nc-header" style="color:var(--pink);">🔀 选择器节点（IF，循环体内）</div>
         <div class="nc-row"><div class="nc-key">条件（继续）</div><div class="nc-val"><code>should_continue == "true"</code> 且 <code>hop_count &lt; max_hops</code> → 走「计算节点」</div></div>
         <div class="nc-row"><div class="nc-key">否则（停止）</div><div class="nc-val">→ 走「终止循环节点」，退出循环</div></div>
+        <div class="callout warn" style="margin:8px 0 0 0;">
+          <div class="icon">⚠️</div>
+          <div class="body"><strong>比较值填写格式：</strong>右侧比较值填 <code>true</code>（纯字符串，不加引号）。若 Coze 自动加了转义引号变成 <code>"\"true\""</code>，条件将永远为 false，循环体直接走终止分支，多跳推理失效。</div>
+        </div>
       </div>
 
       <!-- Node 5A: 计算节点（选择器继续分支） -->
@@ -1192,10 +1228,20 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
           <div class="code-wrap" style="margin:0;">
             <div class="code-header"><span class="lang">PYTHON</span></div>
             <pre><span class="kw">async def</span> <span class="fn">main</span>(hop_count: int = <span class="num">0</span>, next_entity: str = <span class="str">""</span>, updated_context: str = <span class="str">""</span>) -> dict:
+    <span class="cmt"># Coze 应用变量以 Args 对象传入，支持 == 比较但不支持算术，用等值比较提取整数</span>
+    count = <span class="num">0</span>
+    <span class="kw">try</span>:
+        count = <span class="fn">int</span>(hop_count)
+    <span class="kw">except</span> (TypeError, ValueError):
+        <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">10</span>):
+            <span class="kw">if</span> hop_count == i:
+                count = i
+                <span class="kw">break</span>
+
     <span class="kw">return</span> {
-        <span class="str">"new_hop_count"</span>: hop_count + <span class="num">1</span>,
-        <span class="str">"new_entity"</span>: next_entity,
-        <span class="str">"new_context"</span>: updated_context
+        <span class="str">"new_hop_count"</span>: count + <span class="num">1</span>,
+        <span class="str">"new_entity"</span>: <span class="fn">str</span>(next_entity),
+        <span class="str">"new_context"</span>: <span class="fn">str</span>(updated_context)
     }</pre>
           </div>
         </div></div>
