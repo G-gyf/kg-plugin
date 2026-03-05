@@ -1055,7 +1055,8 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
         </div>
         <div class="callout info" style="margin-top:8px;">
           <div class="icon">ℹ️</div>
-          <div class="body">变量赋值节点只支持「变量引用」或「字面量」，<strong>不支持表达式运算</strong>（如 hop_count + 1）。需要运算时先用 Code Node 计算，再用变量赋值写回。</div>
+          <div class="body">变量赋值节点只支持「变量引用」或「字面量」，<strong>不支持表达式运算</strong>（如 hop_count + 1）。需要运算时先用 Code Node 计算，再用变量赋值写回。<br><br>
+          <strong>Code Node 书写规则：</strong>① 函数定义必须用 <code>async def</code>；② 所有参数必须给默认值（如 <code>hop_count: int = 0</code>）；③ 类型注解冒号后必须有一个空格（如 <code>str = ""</code>，不能写 <code>str=""</code>）。</div>
         </div>
       </div>
 
@@ -1081,7 +1082,7 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
         <div class="nc-row"><div class="nc-key">代码</div><div class="nc-val">
           <div class="code-wrap" style="margin:0;">
             <div class="code-header"><span class="lang">PYTHON</span></div>
-            <pre><span class="kw">def</span> <span class="fn">main</span>(current_entity: str, hop_count: int, query_intent_global: str) -> dict:
+            <pre><span class="kw">async def</span> <span class="fn">main</span>(current_entity: str = <span class="str">""</span>, hop_count: int = <span class="num">0</span>, query_intent_global: str = <span class="str">""</span>) -> dict:
     <span class="kw">if</span> query_intent_global == <span class="str">"path_finding"</span>:
         action = <span class="str">"queryNeighbors"</span>
         depth = <span class="num">2</span>
@@ -1134,7 +1135,7 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
             <div class="code-header"><span class="lang">PYTHON</span></div>
             <pre><span class="kw">import</span> json
 
-<span class="kw">def</span> <span class="fn">main</span>(found: bool = <span class="kw">False</span>, count: int = <span class="num">0</span>,
+<span class="kw">async def</span> <span class="fn">main</span>(found: bool = <span class="kw">False</span>, count: int = <span class="num">0</span>,
          entities: list = [], triples: list = [],
          message: str = <span class="str">""</span>, source_entity: str = <span class="str">""</span>) -> dict:
     result = {
@@ -1190,7 +1191,7 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
         <div class="nc-row"><div class="nc-key">代码</div><div class="nc-val">
           <div class="code-wrap" style="margin:0;">
             <div class="code-header"><span class="lang">PYTHON</span></div>
-            <pre><span class="kw">def</span> <span class="fn">main</span>(hop_count: int, next_entity: str, updated_context: str) -> dict:
+            <pre><span class="kw">async def</span> <span class="fn">main</span>(hop_count: int = <span class="num">0</span>, next_entity: str = <span class="str">""</span>, updated_context: str = <span class="str">""</span>) -> dict:
     <span class="kw">return</span> {
         <span class="str">"new_hop_count"</span>: hop_count + <span class="num">1</span>,
         <span class="str">"new_entity"</span>: next_entity,

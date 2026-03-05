@@ -313,6 +313,88 @@ paths:
                           type: string
                           description: 实体定义
 
+  /dispatch:
+    post:
+      operationId: dispatch
+      summary: 统一分发查询
+      description: 统一分发接口，由 action 字段路由到对应查询逻辑，供 Coze Workflow 单节点调用。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  type: string
+                  description: "操作名称：queryEntity | queryNeighbors | findPath | fuzzySearch"
+                entity_name:
+                  type: string
+                  description: 实体名称（queryEntity / queryNeighbors 时使用）
+                fuzzy:
+                  type: boolean
+                  default: false
+                  description: 是否模糊匹配
+                depth:
+                  type: integer
+                  default: 1
+                  minimum: 1
+                  maximum: 3
+                  description: 查询深度（queryNeighbors 时使用）
+                limit:
+                  type: integer
+                  default: 20
+                  minimum: 1
+                  maximum: 50
+                  description: 返回结果上限
+                start_entity:
+                  type: string
+                  description: 起始实体（findPath 时使用）
+                end_entity:
+                  type: string
+                  description: 目标实体（findPath 时使用）
+                max_hops:
+                  type: integer
+                  default: 4
+                  minimum: 1
+                  maximum: 6
+                  description: 最大跳数（findPath 时使用）
+                keyword:
+                  type: string
+                  description: 模糊搜索关键词（fuzzySearch 时使用）
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  found:
+                    type: boolean
+                    description: 是否找到结果
+                  count:
+                    type: integer
+                    description: 结果数量
+                  message:
+                    type: string
+                    description: 提示信息
+                  entities:
+                    type: array
+                    description: 实体列表（queryEntity 返回）
+                    items:
+                      type: object
+                  triples:
+                    type: array
+                    description: 三元组列表（queryNeighbors 返回）
+                    items:
+                      type: object
+                  source_entity:
+                    type: string
+                    description: 查询的源实体名称
+
   /health:
     get:
       operationId: healthCheck
