@@ -95,7 +95,7 @@ function initCoze() {
         bot_id: '7479555441093165082',
       },
       auth: {
-        type: CozeWebSDK.AuthType.anonymous,
+        type: 'anonymous',
       },
       el: el,
       ui: {
