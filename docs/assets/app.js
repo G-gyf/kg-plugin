@@ -135,26 +135,58 @@ async function initCoze() {
 // ── 捕获 SDK asstBtn 并隐藏 ──────────────────
 function watchForSdkBtn() {
   const appBody = document.querySelector('.app-body');
-  const mo = new MutationObserver(() => {
-    const candidates = document.querySelectorAll('button, [role="button"]');
-    for (const btn of candidates) {
-      if (!appBody?.contains(btn)) {
-        sdkBtnRef = btn;
-        btn.style.setProperty('display', 'none', 'important');
-        mo.disconnect();
-        break;
+  const mo = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        if (appBody?.contains(node)) continue;           // 忽略我们自己布局内的节点
+        const btn = node.matches('button,[role="button"]')
+          ? node
+          : node.querySelector('button,[role="button"]');
+        if (btn) {
+          sdkBtnRef = btn;
+          hideSdkBtn(btn);
+          mo.disconnect();
+          return;
+        }
       }
     }
   });
   mo.observe(document.body, { childList: true, subtree: true });
 }
 
+function hideSdkBtn(btn) {
+  // opacity:0 而非 display:none，保留 .click() 可触发性
+  btn.style.setProperty('opacity', '0', 'important');
+  btn.style.setProperty('pointer-events', 'none', 'important');
+  // 同时隐藏 body 一级容器（防止占据空间）
+  let el = btn;
+  while (el.parentElement && el.parentElement !== document.body) el = el.parentElement;
+  if (el !== btn) {
+    el.style.setProperty('opacity', '0', 'important');
+    el.style.setProperty('pointer-events', 'none', 'important');
+  }
+}
+
 // ── 打开聊天（点击启动按钮时）────────────────────
 function openCozeChat() {
   document.getElementById('chat-launch').style.display = 'none';
   document.getElementById('chat-wrapper').style.display = 'block';
+
+  // 若 MO 尚未捕获，在此兜底搜索
+  if (!sdkBtnRef) {
+    const appBody = document.querySelector('.app-body');
+    for (const btn of document.querySelectorAll('button,[role="button"]')) {
+      if (!appBody?.contains(btn)) { sdkBtnRef = btn; break; }
+    }
+  }
+
   if (sdkBtnRef) {
+    // 临时恢复可见性，确保 SDK 事件处理正常触发
+    sdkBtnRef.style.removeProperty('opacity');
+    sdkBtnRef.style.removeProperty('pointer-events');
     sdkBtnRef.click();
+    requestAnimationFrame(() => hideSdkBtn(sdkBtnRef));
   } else {
     showToast('聊天服务加载中，请稍后再试');
   }
