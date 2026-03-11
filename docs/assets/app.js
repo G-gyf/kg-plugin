@@ -93,7 +93,7 @@ function initCoze() {
     chatClient = new CozeWebSDK.WebChatClient({
       config: {
         type: 'bot',
-        bot_id: '7479555441093165082',
+        bot_id: '7613708062620696585',
         isIframe: true,
       },
       auth: {
