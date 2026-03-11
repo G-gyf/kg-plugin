@@ -111,7 +111,7 @@ function initCoze() {
           isNeedClose: false,
         },
         asstBtn: {
-          isNeed: true,
+          isNeed: false,
         },
         chatBot: {
           title: '货币金融学助手',
