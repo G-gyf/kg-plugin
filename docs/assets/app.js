@@ -130,17 +130,18 @@ function initCoze() {
 
 // ── 打开聊天（点击启动按钮时）────────────────────
 function openCozeChat() {
-  // 找 SDK 注入的浮钮并点击
-  let triggered = false;
-  for (const node of document.body.children) {
-    if (node.id === 'toast' || node.id === 'graph-panel') continue;
-    const style = window.getComputedStyle(node);
-    if (style.position === 'fixed') {
-      const btn = node.querySelector('button') || (node.tagName === 'BUTTON' ? node : null);
-      if (btn) { btn.click(); triggered = true; break; }
-    }
+  // 找页面上不属于我们自己布局的按钮（即 SDK 注入的浮钮）
+  const ours = document.querySelector('.app-body');
+  const allBtns = document.querySelectorAll('button, [role="button"]');
+  for (const btn of allBtns) {
+    if (btn.id === 'chat-launch-btn') continue;        // 排除自己
+    if (ours && ours.contains(btn)) continue;           // 排除我们自己的布局
+    if (document.querySelector('.site-header')?.contains(btn)) continue;
+    if (document.querySelector('.site-footer')?.contains(btn)) continue;
+    btn.click();
+    return;
   }
-  if (!triggered) showToast('聊天服务加载中，请稍后再试');
+  showToast('聊天服务加载中，请稍后再试');
 }
 
 // ── 发送到聊天框（带剪贴板降级）────────────────
