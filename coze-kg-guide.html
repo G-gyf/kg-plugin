@@ -717,7 +717,7 @@ curl http://localhost:8000/health
 curl -X POST http://localhost:8000/query_entity \
   -H "Content-Type: application/json" \
   -H "X-API-Key: KG2025-MySecretKey-ChangeThis" \
-  -d '{"entity_name": "深度学习"}'</pre>
+  -d '{"entity_name": "活期存款"}'</pre>
       </div>
 
       <p style="margin-top:8px;">成功的 <code>/health</code> 响应：</p>
@@ -907,7 +907,7 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
       <p>插件保存后，点击每个操作右侧的「调试」按钮，手动填入参数测试：</p>
       <div class="code-wrap">
         <div class="code-header"><span class="lang">JSON</span><span class="fname">queryEntity 测试参数</span></div>
-        <pre>{ <span class="key">"entity_name"</span>: <span class="str">"深度学习"</span>, <span class="key">"fuzzy"</span>: <span class="num">false</span> }</pre>
+        <pre>{ <span class="key">"entity_name"</span>: <span class="str">"活期存款"</span>, <span class="key">"fuzzy"</span>: <span class="num">false</span> }</pre>
       </div>
       <div class="callout success">
         <div class="icon">✅</div>
@@ -1190,15 +1190,22 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
 已收集信息：{{context_graph}}
 本次查询结果：{{kg_result_global}}
 
+【数据结构说明】
+kg_result_global 中每个实体的 properties 包含：
+- name：实体名称
+- description：实体描述
+- attributes：JSON 字符串，内含详细属性，如"特点"、"功能/作用"、"定义"、"类型"、"例子"、"背景/原因"、"统计口径"、"计算公式"等
+请解析 attributes 字段以获取实体的完整信息，再判断是否已足够回答原问题。
+
 判断：
-1. 当前信息是否已足够回答原始问题？
+1. 当前信息（含 attributes 中的详细属性）是否已足够回答原始问题？
 2. 如果需要继续，下一步应该查哪个实体？
 
 输出纯 JSON：
 {
   "should_continue": "true 或 false",
   "next_entity": "下一跳要查询的实体名，不需要继续则为空字符串",
-  "updated_context": "将本次查询结果合并到已有 context 的精简摘要",
+  "updated_context": "将本次查询结果（含关键 attributes）合并到已有 context 的精简摘要",
   "reason": "判断理由（一句话）"
 }</div>
         </div></div>
@@ -1285,8 +1292,16 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
 用户问题：{{user_query}}
 推理过程（共 {{hop_count}} 跳）：{{context_graph}}
 
+【数据结构说明】
+context_graph 中每个实体的 properties 包含：
+- name：实体名称
+- description：实体基础描述
+- attributes：JSON 字符串，内含详细属性，如"特点"、"功能/作用"、"定义"、"类型"、"例子"、"背景/原因"、"统计口径"、"计算公式"等
+请充分利用 attributes 中的详细属性来丰富答案内容。
+
 要求：
 - 直接回答问题，语言自然流畅
+- 引用实体的 attributes 中相关属性（如特点、功能/作用、定义等）作为答案依据
 - 在答案末尾附上「推理路径」，格式：
   「推理路径：实体A → 关系X → 实体B → 关系Y → 实体C」
 - 若信息不足，诚实说明并给出已知部分</div>
@@ -1394,7 +1409,7 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
 你拥有访问知识图谱数据库的能力，可以进行多跳推理。
 
 <span class="p-cmt"># 能力说明</span>
-- 查询特定概念的定义和属性
+- 查询特定概念的定义、描述及详细属性（特点、功能/作用、类型、例子、统计口径、计算公式等）
 - 探索概念之间的关系（支持最多 3 跳推理）
 - 发现两个概念之间的知识路径
 - 归纳某类概念的所有相关实体

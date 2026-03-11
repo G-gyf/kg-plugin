@@ -290,7 +290,7 @@ async def fuzzy_search(req: FuzzySearchRequest):
             cypher = """
                 MATCH (n)
                 WHERE toLower(n.name) CONTAINS toLower($keyword)
-                RETURN n.name AS name, labels(n) AS labels, n.definition AS definition
+                RETURN n.name AS name, labels(n) AS labels, n.description AS description, n.attributes AS attributes
                 LIMIT $limit
             """
             result = session.run(cypher, keyword=req.keyword, limit=req.limit)
@@ -298,7 +298,8 @@ async def fuzzy_search(req: FuzzySearchRequest):
                 {
                     "name": record["name"],
                     "labels": record["labels"],
-                    "definition": record["definition"],
+                    "description": record["description"],
+                    "attributes": record["attributes"],
                 }
                 for record in result
             ]
