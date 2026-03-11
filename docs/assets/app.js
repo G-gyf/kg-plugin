@@ -8,6 +8,7 @@ const SESSION_ID   = crypto.randomUUID ? crypto.randomUUID() : Math.random().toS
 
 // ── Coze SDK 客户端（Phase 2 可绑定消息事件）──
 let chatClient = null;
+let sdkBtnRef  = null;   // SDK 创建的 asstBtn 引用（MO 捕获后隐藏）
 
 // ── 示例问题数组 ──────────────────────────────
 const EXAMPLE_QUESTIONS = [
@@ -74,6 +75,7 @@ const TOPIC_CLASS = {
 
 // ── 初始化 ────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  initCoze();
   renderQuestions('all');
   bindTagFilters();
   bindFeedback();
@@ -115,7 +117,7 @@ async function initCoze() {
       },
       ui: {
         base: { layout: 'pc', lang: 'zh-CN' },
-        asstBtn: { isNeed: false },
+        asstBtn: { isNeed: true },
         chatBot: {
           title: '货币金融学助手',
           uploadable: false,
@@ -124,18 +126,37 @@ async function initCoze() {
         footer: { isShow: false },
       },
     });
+    watchForSdkBtn();
   } catch (e) {
     console.error('CozeWebSDK init error:', e);
   }
+}
+
+// ── 捕获 SDK asstBtn 并隐藏 ──────────────────
+function watchForSdkBtn() {
+  const appBody = document.querySelector('.app-body');
+  const mo = new MutationObserver(() => {
+    const candidates = document.querySelectorAll('button, [role="button"]');
+    for (const btn of candidates) {
+      if (!appBody?.contains(btn)) {
+        sdkBtnRef = btn;
+        btn.style.setProperty('display', 'none', 'important');
+        mo.disconnect();
+        break;
+      }
+    }
+  });
+  mo.observe(document.body, { childList: true, subtree: true });
 }
 
 // ── 打开聊天（点击启动按钮时）────────────────────
 function openCozeChat() {
   document.getElementById('chat-launch').style.display = 'none';
   document.getElementById('chat-wrapper').style.display = 'block';
-  // 点击后才初始化 SDK，确保挂载元素已可见
-  if (!chatClient) {
-    initCoze();
+  if (sdkBtnRef) {
+    sdkBtnRef.click();
+  } else {
+    showToast('聊天服务加载中，请稍后再试');
   }
 }
 
