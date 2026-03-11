@@ -98,8 +98,8 @@ function initCoze() {
       },
       auth: {
         type: 'token',
-        token: 'pat_lsqiF7e5fTad2Jco60b0aTCoTKnMCvjH3WmoMaWvfUJP1YrZwbfZsCawKZKVW9AQ',
-        onRefreshToken: async () => 'pat_lsqiF7e5fTad2Jco60b0aTCoTKnMCvjH3WmoMaWvfUJP1YrZwbfZsCawKZKVW9AQ',
+        token: 'pat_2cQHMTQPJnWoYSTzuYUeXnAU3HKqhfNeNN5DKgNd9UcyKcHnWJ7ItTfuHpHqS8wG',
+        onRefreshToken: async () => 'pat_2cQHMTQPJnWoYSTzuYUeXnAU3HKqhfNeNN5DKgNd9UcyKcHnWJ7ItTfuHpHqS8wG',
       },
       ui: {
         base: {
