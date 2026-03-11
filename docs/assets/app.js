@@ -74,7 +74,6 @@ const TOPIC_CLASS = {
 
 // ── 初始化 ────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  initCoze();
   renderQuestions('all');
   bindTagFilters();
   bindFeedback();
@@ -134,6 +133,10 @@ async function initCoze() {
 function openCozeChat() {
   document.getElementById('chat-launch').style.display = 'none';
   document.getElementById('chat-wrapper').style.display = 'block';
+  // 点击后才初始化 SDK，确保挂载元素已可见
+  if (!chatClient) {
+    initCoze();
+  }
 }
 
 // ── 发送到聊天框（带剪贴板降级）────────────────
