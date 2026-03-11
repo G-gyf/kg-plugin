@@ -82,45 +82,41 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Coze SDK 初始化 ───────────────────────────
-function initCoze() {
+async function initCoze() {
   const el = document.getElementById('chat-container');
   if (!el || typeof CozeWebSDK === 'undefined') {
     console.warn('CozeWebSDK not loaded');
     return;
   }
 
+  // 从后端获取 token，PAT 不暴露在前端源码中
+  let token;
+  try {
+    const res = await fetch('https://kg-plugin-production.up.railway.app/coze-token');
+    const data = await res.json();
+    token = data.token;
+  } catch (e) {
+    console.error('Failed to fetch Coze token:', e);
+    return;
+  }
+
   try {
     chatClient = new CozeWebSDK.WebChatClient({
       config: {
-        type: 'bot',
         bot_id: '7613708062620696585',
-        isIframe: true,
       },
       auth: {
         type: 'token',
-        token: 'pat_2cQHMTQPJnWoYSTzuYUeXnAU3HKqhfNeNN5DKgNd9UcyKcHnWJ7ItTfuHpHqS8wG',
-        onRefreshToken: async () => 'pat_2cQHMTQPJnWoYSTzuYUeXnAU3HKqhfNeNN5DKgNd9UcyKcHnWJ7ItTfuHpHqS8wG',
+        token: token,
+        onRefreshToken: async () => {
+          const res = await fetch('https://kg-plugin-production.up.railway.app/coze-token');
+          const data = await res.json();
+          return data.token;
+        },
       },
-      ui: {
-        base: {
-          layout: 'pc',
-          lang: 'zh-CN',
-        },
-        header: {
-          isShow: true,
-          isNeedClose: false,
-        },
-        asstBtn: {
-          isNeed: true,
-        },
-        chatBot: {
-          title: '货币金融学助手',
-          uploadable: false,
-          el: el,
-        },
-        footer: {
-          isShow: false,
-        },
+      componentProps: {
+        title: '货币金融学助手',
+        el: el,
       },
     });
   } catch (e) {
@@ -130,18 +126,8 @@ function initCoze() {
 
 // ── 打开聊天（点击启动按钮时）────────────────────
 function openCozeChat() {
-  // 找页面上不属于我们自己布局的按钮（即 SDK 注入的浮钮）
-  const ours = document.querySelector('.app-body');
-  const allBtns = document.querySelectorAll('button, [role="button"]');
-  for (const btn of allBtns) {
-    if (btn.id === 'chat-launch-btn') continue;        // 排除自己
-    if (ours && ours.contains(btn)) continue;           // 排除我们自己的布局
-    if (document.querySelector('.site-header')?.contains(btn)) continue;
-    if (document.querySelector('.site-footer')?.contains(btn)) continue;
-    btn.click();
-    return;
-  }
-  showToast('聊天服务加载中，请稍后再试');
+  document.getElementById('chat-launch').style.display = 'none';
+  document.getElementById('chat-wrapper').style.display = 'block';
 }
 
 // ── 发送到聊天框（带剪贴板降级）────────────────

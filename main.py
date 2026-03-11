@@ -290,19 +290,11 @@ async def fuzzy_search(req: FuzzySearchRequest):
             cypher = """
                 MATCH (n)
                 WHERE toLower(n.name) CONTAINS toLower($keyword)
-                RETURN n.name AS name, labels(n) AS labels, n.description AS description, n.attributes AS attributes
+                RETURN n
                 LIMIT $limit
             """
             result = session.run(cypher, keyword=req.keyword, limit=req.limit)
-            candidates = [
-                {
-                    "name": record["name"],
-                    "labels": record["labels"],
-                    "description": record["description"],
-                    "attributes": record["attributes"],
-                }
-                for record in result
-            ]
+            candidates = [serialize_node(record["n"]) for record in result]
 
         elapsed = (time.time() - start) * 1000
         log_query("fuzzy_search", req.model_dump(), len(candidates), elapsed)
@@ -371,6 +363,18 @@ async def dispatch(req: DispatchRequest):
 async def get_logs(limit: int = 50):
     """获取最近的查询日志，用于演示多跳推理路径。"""
     return {"logs": query_logs[-limit:], "total": len(query_logs)}
+
+
+# ─────────────────────────────────────────
+# Coze token 代理（无需鉴权，token 存环境变量）
+# ─────────────────────────────────────────
+
+@app.get("/coze-token")
+async def get_coze_token():
+    token = os.environ.get("COZE_PAT_TOKEN", "")
+    if not token:
+        raise HTTPException(status_code=503, detail="Coze token not configured")
+    return {"token": token}
 
 
 # ─────────────────────────────────────────
