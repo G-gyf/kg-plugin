@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>货币金融学知识图谱问答系统</title>
+  <meta name="description" content="基于知识图谱的货币金融学智能问答，涵盖货币政策、利率、银行体系、国际金融等核心概念">
+  <link rel="stylesheet" href="assets/style.css">
+
+  <!--
+    ⚠️  COZE SDK：请将下方 src 替换为你的 Coze Bot embed 代码中的真实 CDN URL。
+    中国区示例：https://lf-cdn.coze.cn/obj/unpkg/flow-platform/chat-app-sdk/X.X.X/libs/cn/index.js
+    海外示例：  https://sf-cdn.coze.com/obj/unpkg-va/flow-platform/chat-app-sdk/X.X.X/libs/oversea/index.js
+    请勿猜测版本号，直接从 Coze 后台 → Bot → 发布 → 网页端嵌入代码 中复制。
+  -->
+  <script src="https://lf-cdn.coze.cn/obj/unpkg/flow-platform/chat-app-sdk/1.2.0-beta.19/libs/cn/index.js"></script>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="site-header">
+  <div class="header-logo">KG · 货币金融学</div>
+  <div class="header-subtitle">knowledge-graph / monetary-economics</div>
+  <div class="header-status">
+    <div class="status-dot" id="status-dot"></div>
+    <span class="status-label" id="status-label">检测中…</span>
+  </div>
+</header>
+
+<!-- ── MAIN BODY ── -->
+<main class="app-body">
+
+  <!-- ── LEFT PANEL ── -->
+  <aside class="left-panel">
+
+    <!-- 知识领域标签 -->
+    <div class="card">
+      <div class="card-title">知识领域</div>
+      <div class="topic-tags">
+        <button class="topic-tag tag-all active" data-topic="all">全部</button>
+        <button class="topic-tag tag-policy"    data-topic="policy">货币政策</button>
+        <button class="topic-tag tag-inflation" data-topic="inflation">通货膨胀</button>
+        <button class="topic-tag tag-rate"      data-topic="rate">利率</button>
+        <button class="topic-tag tag-bank"      data-topic="bank">商业银行</button>
+        <button class="topic-tag tag-intl"      data-topic="intl">国际金融</button>
+        <button class="topic-tag tag-supply"    data-topic="supply">货币供给</button>
+        <button class="topic-tag tag-central"   data-topic="central">中央银行</button>
+      </div>
+    </div>
+
+    <!-- 示例问题 -->
+    <div class="card">
+      <div class="card-title">示例问题</div>
+      <div class="question-list" id="question-list">
+        <!-- 由 app.js 动态渲染 -->
+      </div>
+    </div>
+
+    <!-- 提问技巧 -->
+    <div class="card">
+      <div class="card-title">提问技巧</div>
+      <div class="tips-list">
+        <div class="tip-item">
+          <span class="tip-icon">🎯</span>
+          <span><strong>具体概念</strong>：直接问"XX是什么"比问"帮我学习货币学"效果更好</span>
+        </div>
+        <div class="tip-item">
+          <span class="tip-icon">🔗</span>
+          <span><strong>关系推理</strong>：问"A对B有什么影响"可触发知识图谱多跳推理</span>
+        </div>
+        <div class="tip-item">
+          <span class="tip-icon">📊</span>
+          <span><strong>举例对比</strong>：加上"举例说明"或"与XX相比"可获得更丰富解释</span>
+        </div>
+        <div class="tip-item">
+          <span class="tip-icon">🌍</span>
+          <span><strong>联系实际</strong>：结合"中国/美国当前政策"可获得更贴近现实的分析</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 答案质量反馈 -->
+    <div class="card">
+      <div class="card-title">答案质量反馈</div>
+      <div class="feedback-row">
+        <span class="feedback-label">本次对话答案是否有帮助？</span>
+        <div class="feedback-btns">
+          <button class="feedback-btn up"   data-vote="up">👍 有帮助</button>
+          <button class="feedback-btn down" data-vote="down">👎 待改进</button>
+        </div>
+        <span class="feedback-thanks" id="feedback-thanks">感谢反馈！</span>
+      </div>
+    </div>
+
+    <!-- 知识资料库 -->
+    <div class="card">
+      <div class="card-title">知识资料库</div>
+      <div class="resource-list">
+        <a class="resource-item" href="#" title="货币政策概论">
+          <span class="resource-icon">📄</span>
+          <span>货币政策概论</span>
+          <span class="resource-tag">PDF</span>
+        </a>
+        <a class="resource-item" href="#" title="利率理论与实践">
+          <span class="resource-icon">📄</span>
+          <span>利率理论与实践</span>
+          <span class="resource-tag">PDF</span>
+        </a>
+        <a class="resource-item" href="#" title="国际金融体系">
+          <span class="resource-icon">📄</span>
+          <span>国际金融体系</span>
+          <span class="resource-tag">PDF</span>
+        </a>
+        <a class="resource-item" href="#" title="商业银行学">
+          <span class="resource-icon">📄</span>
+          <span>商业银行学</span>
+          <span class="resource-tag">PDF</span>
+        </a>
+        <a class="resource-item" href="#" title="中央银行学">
+          <span class="resource-icon">📄</span>
+          <span>中央银行学</span>
+          <span class="resource-tag">PDF</span>
+        </a>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── RIGHT PANEL (Chat) ── -->
+  <section class="right-panel">
+    <div class="chat-wrapper">
+      <!-- Coze WebSDK 将挂载到此 div -->
+      <div id="chat-container"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Phase 2 预留：KG 可视化面板（hidden）── -->
+<div id="graph-panel" class="graph-panel" style="display:none">
+  <!-- Phase 2: D3.js / vis.js 知识图谱可视化 -->
+</div>
+
+<!-- ── FOOTER ── -->
+<footer class="site-footer">
+  <div class="footer-stack">
+    <span style="color:var(--text-dim);margin-right:4px;">技术栈</span>
+    <span class="footer-chip blue">Neo4j KG</span>
+    <span class="footer-chip green">FastAPI</span>
+    <span class="footer-chip purple">Coze Bot</span>
+    <span class="footer-chip orange">Railway</span>
+  </div>
+  <div class="footer-links">
+    <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://kg-plugin-production.up.railway.app/docs" target="_blank" rel="noopener">API Docs</a>
+  </div>
+</footer>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
