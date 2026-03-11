@@ -438,6 +438,52 @@ body {
 
 .footer-links a:hover { color: var(--blue); }
 
+/* ── CHAT LAUNCH PLACEHOLDER ── */
+.chat-launch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  height: 560px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  text-align: center;
+  padding: 32px;
+}
+
+.chat-launch-icon { font-size: 48px; }
+
+.chat-launch-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.chat-launch-desc {
+  font-size: 12px;
+  color: var(--text-mid);
+  max-width: 320px;
+  line-height: 1.6;
+}
+
+.chat-launch-btn {
+  margin-top: 8px;
+  padding: 10px 32px;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Noto Sans SC', sans-serif;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.chat-launch-btn:hover { opacity: 0.85; }
+
 /* ── GRAPH PANEL (Phase 2, hidden) ── */
 .graph-panel { display: none; }
 .graph-node  { display: none; }

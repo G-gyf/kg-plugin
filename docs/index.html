@@ -128,7 +128,14 @@
 
   <!-- ── RIGHT PANEL (Chat) ── -->
   <section class="right-panel">
-    <div class="chat-wrapper">
+    <!-- 启动按钮：SDK 就绪后点击打开聊天 -->
+    <div class="chat-launch" id="chat-launch">
+      <div class="chat-launch-icon">💬</div>
+      <div class="chat-launch-title">货币金融学助手</div>
+      <div class="chat-launch-desc">基于知识图谱，涵盖货币政策、利率、银行体系、国际金融等核心概念</div>
+      <button class="chat-launch-btn" id="chat-launch-btn" onclick="openCozeChat()">开始对话</button>
+    </div>
+    <div class="chat-wrapper" id="chat-wrapper" style="display:none">
       <!-- Coze WebSDK 将挂载到此 div -->
       <div id="chat-container"></div>
     </div>

@@ -123,37 +123,24 @@ function initCoze() {
         },
       },
     });
-    // SDK 加载完成后自动点击浮钮打开聊天
-    autoClickAsstBtn();
   } catch (e) {
     console.error('CozeWebSDK init error:', e);
   }
 }
 
-// 用 MutationObserver 等待浮钮出现后自动点击
-function autoClickAsstBtn() {
-  let clicked = false;
-  const tryClick = () => {
-    if (clicked) return;
-    // 找 body 直属的 fixed 定位子元素（SDK 注入的浮钮容器）
-    for (const node of document.body.children) {
-      if (node.id === 'toast' || node.id === 'graph-panel') continue;
-      const style = window.getComputedStyle(node);
-      if (style.position === 'fixed') {
-        const btn = node.querySelector('button') || (node.tagName === 'BUTTON' ? node : null);
-        if (btn) {
-          btn.click();
-          clicked = true;
-          observer.disconnect();
-          return;
-        }
-      }
+// ── 打开聊天（点击启动按钮时）────────────────────
+function openCozeChat() {
+  // 找 SDK 注入的浮钮并点击
+  let triggered = false;
+  for (const node of document.body.children) {
+    if (node.id === 'toast' || node.id === 'graph-panel') continue;
+    const style = window.getComputedStyle(node);
+    if (style.position === 'fixed') {
+      const btn = node.querySelector('button') || (node.tagName === 'BUTTON' ? node : null);
+      if (btn) { btn.click(); triggered = true; break; }
     }
-  };
-  const observer = new MutationObserver(tryClick);
-  observer.observe(document.body, { childList: true });
-  // 最多等 6 秒
-  setTimeout(() => observer.disconnect(), 6000);
+  }
+  if (!triggered) showToast('聊天服务加载中，请稍后再试');
 }
 
 // ── 发送到聊天框（带剪贴板降级）────────────────
