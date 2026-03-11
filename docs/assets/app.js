@@ -114,9 +114,15 @@ async function initCoze() {
           return data.token;
         },
       },
-      componentProps: {
-        title: '货币金融学助手',
-        el: el,
+      ui: {
+        base: { layout: 'pc', lang: 'zh-CN' },
+        asstBtn: { isNeed: false },
+        chatBot: {
+          title: '货币金融学助手',
+          uploadable: false,
+          el: el,
+        },
+        footer: { isShow: false },
       },
     });
   } catch (e) {
