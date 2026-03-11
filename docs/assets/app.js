@@ -94,7 +94,7 @@ function initCoze() {
       config: {
         type: 'bot',
         bot_id: '7479555441093165082',
-        isIframe: false,
+        isIframe: true,
       },
       auth: {
         type: 'token',
