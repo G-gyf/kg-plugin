@@ -132,64 +132,59 @@ async function initCoze() {
   }
 }
 
-// ── 捕获 SDK asstBtn 并隐藏 ──────────────────
+// ── 捕获 SDK 浮钮容器（监听 body 直接子节点）──
 function watchForSdkBtn() {
-  const appBody = document.querySelector('.app-body');
+  // 页面加载时就存在的 body 直接子节点白名单
+  const ownEls = new Set([
+    document.querySelector('.site-header'),
+    document.querySelector('.app-body'),
+    document.getElementById('graph-panel'),
+    document.querySelector('.site-footer'),
+    document.getElementById('toast'),
+  ]);
   const mo = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (node.nodeType !== 1) continue;
-        if (appBody?.contains(node)) continue;           // 忽略我们自己布局内的节点
-        const btn = node.matches('button,[role="button"]')
-          ? node
-          : node.querySelector('button,[role="button"]');
-        if (btn) {
-          sdkBtnRef = btn;
-          hideSdkBtn(btn);
+        // SDK 会把浮钮容器直接插到 body，不在我们的布局里
+        if (node.parentElement === document.body && !ownEls.has(node)) {
+          sdkBtnRef = node;
+          hideSdkContainer(node);
           mo.disconnect();
           return;
         }
       }
     }
   });
-  mo.observe(document.body, { childList: true, subtree: true });
+  // 只监听 body 直接子节点，无需 subtree
+  mo.observe(document.body, { childList: true });
 }
 
-function hideSdkBtn(btn) {
-  // opacity:0 而非 display:none，保留 .click() 可触发性
-  btn.style.setProperty('opacity', '0', 'important');
-  btn.style.setProperty('pointer-events', 'none', 'important');
-  // 同时隐藏 body 一级容器（防止占据空间）
-  let el = btn;
-  while (el.parentElement && el.parentElement !== document.body) el = el.parentElement;
-  if (el !== btn) {
-    el.style.setProperty('opacity', '0', 'important');
-    el.style.setProperty('pointer-events', 'none', 'important');
-  }
+function hideSdkContainer(el) {
+  el.style.setProperty('opacity', '0', 'important');
+  el.style.setProperty('pointer-events', 'none', 'important');
 }
 
 // ── 打开聊天（点击启动按钮时）────────────────────
 function openCozeChat() {
   document.getElementById('chat-launch').style.display = 'none';
   document.getElementById('chat-wrapper').style.display = 'block';
+  triggerSdkOpen();
+}
 
-  // 若 MO 尚未捕获，在此兜底搜索
+function triggerSdkOpen() {
   if (!sdkBtnRef) {
-    const appBody = document.querySelector('.app-body');
-    for (const btn of document.querySelectorAll('button,[role="button"]')) {
-      if (!appBody?.contains(btn)) { sdkBtnRef = btn; break; }
-    }
-  }
-
-  if (sdkBtnRef) {
-    // 临时恢复可见性，确保 SDK 事件处理正常触发
-    sdkBtnRef.style.removeProperty('opacity');
-    sdkBtnRef.style.removeProperty('pointer-events');
-    sdkBtnRef.click();
-    requestAnimationFrame(() => hideSdkBtn(sdkBtnRef));
-  } else {
     showToast('聊天服务加载中，请稍后再试');
+    return;
   }
+  // 恢复可见性，确保 SDK 内部事件正常响应
+  sdkBtnRef.style.removeProperty('opacity');
+  sdkBtnRef.style.removeProperty('pointer-events');
+  // 优先找内部按钮，其次 shadow DOM，最后直接点容器
+  const inner = sdkBtnRef.querySelector('button,[role="button"]')
+    ?? sdkBtnRef.shadowRoot?.querySelector('button,[role="button"]');
+  (inner ?? sdkBtnRef).click();
+  requestAnimationFrame(() => hideSdkContainer(sdkBtnRef));
 }
 
 // ── 发送到聊天框（带剪贴板降级）────────────────
