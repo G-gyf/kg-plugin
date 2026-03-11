@@ -92,18 +92,35 @@ function initCoze() {
   try {
     chatClient = new CozeWebSDK.WebChatClient({
       config: {
+        type: 'bot',
         bot_id: '7479555441093165082',
+        isIframe: false,
       },
       auth: {
-        type: 'anonymous',
+        type: 'token',
+        token: 'cztei_lsyv04TZYBfKC9aayaaf7qjjJaaNibYAzBsJp2c6M4qPCoIHShlvKA13tTjWzOyAd',
+        onRefreshToken: async () => 'cztei_lsyv04TZYBfKC9aayaaf7qjjJaaNibYAzBsJp2c6M4qPCoIHShlvKA13tTjWzOyAd',
       },
-      el: el,
       ui: {
-        chatBot: {
-          name: '货币金融学助手',
-          description: '基于知识图谱，涵盖货币政策、利率、银行体系、国际金融等核心概念',
+        base: {
+          layout: 'pc',
+          lang: 'zh-CN',
         },
-        footer: { isShow: false },
+        header: {
+          isShow: true,
+          isNeedClose: false,
+        },
+        asstBtn: {
+          isNeed: false,
+        },
+        chatBot: {
+          title: '货币金融学助手',
+          uploadable: false,
+          el: el,
+        },
+        footer: {
+          isShow: false,
+        },
       },
     });
   } catch (e) {
