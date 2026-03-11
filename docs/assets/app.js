@@ -102,6 +102,7 @@ async function initCoze() {
   }
 
   try {
+    watchForSdkBtn();   // 必须在构造之前设好，SDK 构造时同步插入容器
     chatClient = new CozeWebSDK.WebChatClient({
       config: {
         bot_id: '7613708062620696585',
@@ -126,7 +127,6 @@ async function initCoze() {
         footer: { isShow: false },
       },
     });
-    watchForSdkBtn();
   } catch (e) {
     console.error('CozeWebSDK init error:', e);
   }
@@ -134,7 +134,6 @@ async function initCoze() {
 
 // ── 捕获 SDK 浮钮容器（监听 body 直接子节点）──
 function watchForSdkBtn() {
-  // 页面加载时就存在的 body 直接子节点白名单
   const ownEls = new Set([
     document.querySelector('.site-header'),
     document.querySelector('.app-body'),
@@ -142,21 +141,32 @@ function watchForSdkBtn() {
     document.querySelector('.site-footer'),
     document.getElementById('toast'),
   ]);
+  // SCRIPT / TEXTAREA 等不是浮钮容器
+  const skipTags = new Set(['SCRIPT', 'STYLE', 'LINK', 'NOSCRIPT', 'TEXTAREA']);
+
+  const tryCapture = (node) => {
+    if (node.nodeType !== 1) return false;
+    if (skipTags.has(node.tagName)) return false;
+    if (ownEls.has(node)) return false;
+    if (node.parentElement !== document.body) return false;
+    sdkBtnRef = node;
+    hideSdkContainer(node);
+    return true;
+  };
+
+  // 立即扫描：SDK 构造时可能已同步插入容器
+  for (const child of document.body.children) {
+    if (tryCapture(child)) return;
+  }
+
+  // 未命中则继续用 MO 等待
   const mo = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
-        if (node.nodeType !== 1) continue;
-        // SDK 会把浮钮容器直接插到 body，不在我们的布局里
-        if (node.parentElement === document.body && !ownEls.has(node)) {
-          sdkBtnRef = node;
-          hideSdkContainer(node);
-          mo.disconnect();
-          return;
-        }
+        if (tryCapture(node)) { mo.disconnect(); return; }
       }
     }
   });
-  // 只监听 body 直接子节点，无需 subtree
   mo.observe(document.body, { childList: true });
 }
 
