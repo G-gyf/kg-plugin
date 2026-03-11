@@ -111,7 +111,7 @@ function initCoze() {
           isNeedClose: false,
         },
         asstBtn: {
-          isNeed: false,
+          isNeed: true,
         },
         chatBot: {
           title: '货币金融学助手',
@@ -123,6 +123,14 @@ function initCoze() {
         },
       },
     });
+    // 尝试自动展开聊天窗口
+    setTimeout(() => {
+      try {
+        if (typeof chatClient.open === 'function') chatClient.open();
+        else if (typeof chatClient.show === 'function') chatClient.show();
+        else if (typeof chatClient.showChat === 'function') chatClient.showChat();
+      } catch (_) {}
+    }, 400);
   } catch (e) {
     console.error('CozeWebSDK init error:', e);
   }
