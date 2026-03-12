@@ -9,6 +9,7 @@ const SESSION_ID   = crypto.randomUUID ? crypto.randomUUID() : Math.random().toS
 // ── Coze SDK 客户端（Phase 2 可绑定消息事件）──
 let chatClient = null;
 let sdkBtnRef  = null;   // SDK 创建的 asstBtn 引用（MO 捕获后隐藏）
+let chatOpen   = false;
 
 // ── 示例问题数组 ──────────────────────────────
 const EXAMPLE_QUESTIONS = [
@@ -127,8 +128,18 @@ async function initCoze() {
         footer: { isShow: false },
       },
     });
+    // 短暂 delay 确保 SDK 完成内部 mount
+    setTimeout(() => openCozeChat(), 300);
   } catch (e) {
     console.error('CozeWebSDK init error:', e);
+    // 失败降级：显示启动卡片，按钮改为"重试连接"
+    const launchEl = document.getElementById('chat-launch');
+    if (launchEl) launchEl.style.display = 'flex';
+    const launchBtn = document.getElementById('chat-launch-btn');
+    if (launchBtn) {
+      launchBtn.textContent = '重试连接';
+      launchBtn.onclick = () => { launchEl.style.display = 'none'; initCoze(); };
+    }
   }
 }
 
@@ -175,15 +186,33 @@ function hideSdkContainer(el) {
   el.style.setProperty('pointer-events', 'none', 'important');
 }
 
-// ── 打开聊天（点击启动按钮时）────────────────────
+// ── 打开聊天 ──────────────────────────────────────
 function openCozeChat() {
-  document.getElementById('chat-launch').style.display = 'none';
-  document.getElementById('chat-wrapper').style.display = 'block';
-  if (chatClient) {
-    chatClient.showChatBot();
-  } else {
-    showToast('聊天服务加载中，请稍后再试');
+  if (sdkBtnRef) {
+    sdkBtnRef.style.removeProperty('opacity');
+    sdkBtnRef.style.removeProperty('pointer-events');
   }
+  document.getElementById('chat-launch').style.display = 'none';
+  document.getElementById('chat-wrapper').style.display = 'flex';
+  chatClient?.showChatBot();
+  updateToggleBtn(true);
+}
+
+// ── 切换聊天面板（关闭后可重开）──────────────────
+function toggleChat() {
+  if (chatOpen) {
+    document.getElementById('chat-wrapper').style.display = 'none';
+    document.getElementById('chat-launch').style.display = 'flex';
+    updateToggleBtn(false);
+  } else {
+    openCozeChat();
+  }
+}
+
+function updateToggleBtn(open) {
+  chatOpen = open;
+  const btn = document.getElementById('chat-toggle-btn');
+  if (btn) btn.textContent = open ? '关闭对话' : '打开对话';
 }
 
 // ── 发送到聊天框（带剪贴板降级）────────────────
