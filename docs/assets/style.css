@@ -1,23 +1,23 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
 :root {
-  --bg:         #080c10;
-  --bg2:        #0d1117;
-  --panel:      #111820;
-  --panel2:     #161e2a;
-  --border:     rgba(255,255,255,0.06);
-  --border2:    rgba(255,255,255,0.10);
-  --blue:       #58a6ff;
-  --primary-dim: rgba(88,166,255,0.12);
-  --green:      #3fb950;
-  --red:        #f85149;
-  --text:       #f0f6fc;
-  --text-mid:   #8d96a0;
-  --text-dim:   #3d444d;
-  --radius-sm:  6px;
-  --radius-md:  10px;
-  --radius-lg:  16px;
-  --ease:       cubic-bezier(0.16, 1, 0.3, 1);
+  --bg:          #f6f8fa;
+  --bg2:         #ffffff;
+  --panel:       #ffffff;
+  --panel2:      #f6f8fa;
+  --border:      #d0d7de;
+  --border2:     #c1c9d2;
+  --blue:        #0969da;
+  --primary-dim: rgba(9,105,218,0.08);
+  --green:       #1a7f37;
+  --red:         #cf222e;
+  --text:        #1a1f2e;
+  --text-mid:    #57606a;
+  --text-dim:    #8c959f;
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   16px;
+  --ease:        cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── RESET ── */
@@ -56,10 +56,7 @@ body {
   font-weight: 600;
   letter-spacing: 0.04em;
   white-space: nowrap;
-  background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--blue);
 }
 
 .header-subtitle {
@@ -90,8 +87,8 @@ body {
   transition: background 0.3s;
 }
 
-.status-dot.online  { background: var(--green); box-shadow: 0 0 6px #3fb95066; }
-.status-dot.offline { background: var(--red);   box-shadow: 0 0 6px #f8514966; }
+.status-dot.online  { background: var(--green); box-shadow: 0 0 6px rgba(26,127,55,0.4); }
+.status-dot.offline { background: var(--red);   box-shadow: 0 0 6px rgba(207,34,46,0.4); }
 
 .status-label { color: var(--text-mid); }
 
@@ -126,7 +123,7 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
-  background: var(--bg2);
+  background: var(--panel);
   flex-direction: column;
 }
 
@@ -137,7 +134,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  background: var(--panel);
+  background: var(--panel2);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -154,7 +151,7 @@ body {
   font-weight: 600;
   padding: 4px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border2);
+  border: 1px solid var(--border);
   background: transparent;
   color: var(--text-mid);
   cursor: pointer;
@@ -164,7 +161,7 @@ body {
 
 #chat-toggle-btn:hover {
   color: var(--blue);
-  border-color: rgba(88,166,255,0.4);
+  border-color: rgba(9,105,218,0.4);
 }
 
 #chat-container {
@@ -177,7 +174,8 @@ body {
   background: var(--panel);
   border-radius: var(--radius-md);
   padding: 16px;
-  box-shadow: 0 1px 0 var(--border);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
 .card-title {
@@ -216,7 +214,7 @@ body {
   font-weight: 700;
   padding: 4px 10px;
   border-radius: 20px;
-  border: 1px solid var(--border2);
+  border: 1px solid var(--border);
   background: transparent;
   color: var(--text-mid);
   cursor: pointer;
@@ -228,12 +226,12 @@ body {
               border-color 0.15s;
 }
 
-.topic-tag:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+.topic-tag:hover { color: var(--text); border-color: var(--border2); }
 
 .topic-tag.active {
   background: var(--primary-dim);
   color: var(--blue);
-  border-color: rgba(88,166,255,0.35);
+  border-color: rgba(9,105,218,0.3);
 }
 
 /* ── EXAMPLE QUESTION CARDS ── */
@@ -338,7 +336,7 @@ body {
   font-weight: 700;
   padding: 5px 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border2);
+  border: 1px solid var(--border);
   background: transparent;
   color: var(--text-mid);
   cursor: pointer;
@@ -351,14 +349,14 @@ body {
 }
 
 .feedback-btn.up:hover:not(:disabled)   {
-  border-color: rgba(63,185,80,0.5);
+  border-color: rgba(26,127,55,0.4);
   color: var(--green);
-  background: rgba(63,185,80,0.08);
+  background: rgba(26,127,55,0.06);
 }
 .feedback-btn.down:hover:not(:disabled) {
-  border-color: rgba(248,81,73,0.5);
+  border-color: rgba(207,34,46,0.4);
   color: var(--red);
-  background: rgba(248,81,73,0.08);
+  background: rgba(207,34,46,0.06);
 }
 
 .feedback-btn:disabled {
@@ -415,12 +413,11 @@ body {
   bottom: 28px;
   left: 50%;
   transform: translateX(-50%) translateY(20px);
-  background: var(--panel);
-  border: 1px solid var(--border2);
+  background: var(--text);
   border-radius: var(--radius-md);
   padding: 10px 20px;
   font-size: 12px;
-  color: var(--text);
+  color: #ffffff;
   font-family: 'JetBrains Mono', monospace;
   z-index: 999;
   opacity: 0;
@@ -458,7 +455,7 @@ body {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.05em;
-  color: var(--text-mid);
+  color: var(--text-dim);
   background: transparent;
 }
 
@@ -505,8 +502,8 @@ body {
 .chat-launch-btn {
   margin-top: 8px;
   padding: 10px 28px;
-  background: var(--text);
-  color: var(--bg2);
+  background: var(--blue);
+  color: #ffffff;
   border: none;
   border-radius: var(--radius-md);
   font-size: 14px;
@@ -516,7 +513,7 @@ body {
   transition: background 0.15s var(--ease);
 }
 
-.chat-launch-btn:hover { background: #ffffff; }
+.chat-launch-btn:hover { background: #0860ca; }
 
 /* ── GRAPH PANEL (Phase 2, hidden) ── */
 .graph-panel { display: none; }
