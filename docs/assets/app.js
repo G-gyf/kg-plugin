@@ -179,22 +179,11 @@ function hideSdkContainer(el) {
 function openCozeChat() {
   document.getElementById('chat-launch').style.display = 'none';
   document.getElementById('chat-wrapper').style.display = 'block';
-  triggerSdkOpen();
-}
-
-function triggerSdkOpen() {
-  if (!sdkBtnRef) {
+  if (chatClient) {
+    chatClient.showChatBot();
+  } else {
     showToast('聊天服务加载中，请稍后再试');
-    return;
   }
-  // 恢复可见性，确保 SDK 内部事件正常响应
-  sdkBtnRef.style.removeProperty('opacity');
-  sdkBtnRef.style.removeProperty('pointer-events');
-  // 优先找内部按钮，其次 shadow DOM，最后直接点容器
-  const inner = sdkBtnRef.querySelector('button,[role="button"]')
-    ?? sdkBtnRef.shadowRoot?.querySelector('button,[role="button"]');
-  (inner ?? sdkBtnRef).click();
-  requestAnimationFrame(() => hideSdkContainer(sdkBtnRef));
 }
 
 // ── 发送到聊天框（带剪贴板降级）────────────────
