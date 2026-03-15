@@ -302,16 +302,26 @@ paths:
                     items:
                       type: object
                       properties:
-                        name:
+                        id:
                           type: string
-                          description: 实体名称
+                          description: 节点元素 ID
                         labels:
                           type: array
                           items:
                             type: string
-                        definition:
-                          type: string
-                          description: 实体定义
+                        properties:
+                          type: object
+                          description: 节点所有属性（含 name、description 及中文属性字段）
+                          properties:
+                            name:
+                              type: string
+                              description: 实体名称
+                            description:
+                              type: string
+                              description: 实体基础描述
+                            attributes:
+                              type: string
+                              description: JSON 字符串，内含详细属性（特点、功能/作用、定义、类型、例子、背景/原因、统计口径、计算公式等）
 
   /dispatch:
     post:
