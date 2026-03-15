@@ -555,6 +555,7 @@ code {
     <a href="#p4s2" class="sidebar-item"><span class="num bg-orange">12</span>配置各节点</a>
     <a href="#p4s3" class="sidebar-item"><span class="num bg-orange">13</span>连线与循环</a>
     <a href="#p4s4" class="sidebar-item"><span class="num bg-orange">14</span>Workflow 测试</a>
+    <a href="#p4s5" class="sidebar-item"><span class="num" style="background:#0c2535;color:#39d0f0;">+</span>向量兜底节点</a>
   </div>
   <div class="sidebar-group">
     <div class="sidebar-group-label">Phase 5 · Bot</div>
@@ -1364,7 +1365,134 @@ context_graph 中每个实体的 properties 包含：
         <li>KG查询节点收到了 Neo4j 的真实数据</li>
         <li>跳转评估正确判断是否继续</li>
         <li>最终答案包含推理路径</li>
+        <li>（如已配置 STEP 14+）输入图谱中不存在但教材中有的问题，确认 <code>kg_ok="0"</code> → KB 节点触发 → 答案末含「来源：教材原文」</li>
       </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══ P4S5 ══ -->
+<section id="p4s5">
+  <div class="phase-header">
+    <div class="phase-num" style="background:#0c2535;color:#39d0f0;">STEP 14+</div>
+    <div>
+      <div class="phase-title">向量检索兜底节点 <span class="tag bg-cyan" style="font-size:9px;vertical-align:middle;">可选</span></div>
+      <div class="phase-sub">当 KG 多跳查询结果为空时，自动回退到教材向量检索</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-body" style="margin-left:0;">
+
+      <div class="callout info">
+        <div class="icon">ℹ️</div>
+        <div class="body"><strong>为什么在 Workflow 层而非 Bot 层绑定知识库？</strong><br>
+        Coze Bot 层绑定知识库后，平台会在每次调用时自动注入 RAG 格式的系统提示词（含大量检索片段 + 格式指令），会干扰 Workflow 答案合成器的输出风格，并使推理路径格式失控。在 Workflow 内部用 KB 节点检索，只在图谱结果不足时触发，完全受 Prompt 控制，不影响 Bot 层逻辑。</div>
+      </div>
+
+      <p style="margin-top:12px;"><strong>准备：在 Coze 空间资源中创建知识库</strong></p>
+      <ol style="margin:8px 0 0 16px;font-size:12px;color:var(--text-mid);line-height:2;">
+        <li>进入 Coze 控制台 → 左侧「资源」→「知识库」→「创建知识库」</li>
+        <li>命名为「教材知识库」，选择文本类型</li>
+        <li>上传教材 PDF 或 Word 文件（支持多文件）</li>
+        <li>等待解析完成（进度条变绿）；记录知识库 ID 备用</li>
+      </ol>
+
+      <div class="callout warn" style="margin-top:10px;">
+        <div class="icon">⚠️</div>
+        <div class="body"><strong>不要</strong>在 Bot 层（STEP 17）绑定同一知识库。两处同时绑定会导致 RAG 提示词重复注入，破坏答案合成器的输出格式。若已配置 STEP 14+，Bot 层知识库行留空即可。</div>
+      </div>
+
+      <p style="margin-top:16px;"><strong>新增全局变量</strong></p>
+      <table>
+        <tr><th>变量名</th><th>类型</th><th>默认值</th><th>用途</th></tr>
+        <tr><td><code>kb_result_global</code></td><td>String</td><td><code>""</code></td><td>存储 KB 检索结果；空字符串表示未触发兜底</td></tr>
+      </table>
+      <p style="font-size:11px;color:var(--text-mid);margin-top:4px;">在 Workflow 「全局变量」面板添加上述变量。</p>
+
+      <p style="margin-top:16px;"><strong>节点 1 — KG 空值检测（Code 节点）</strong></p>
+      <div class="node-config">
+        <div class="nc-header"><span class="cyan">CODE</span>&nbsp;KG空值检测</div>
+        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val"><code>context_graph</code>（全局变量，String）</div></div>
+        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>kg_ok</code>（String）— <code>"1"</code> 充足 / <code>"0"</code> 不足</div></div>
+        <div class="nc-row"><div class="nc-key">语言</div><div class="nc-val">Python</div></div>
+      </div>
+      <div class="code-wrap">
+        <div class="code-header"><span class="lang">PYTHON</span><span class="fname">KG空值检测 · 代码</span></div>
+        <pre><span class="kw">async def</span> <span class="fn">main</span>(context_graph: <span class="cls">str</span> = <span class="str">""</span>) -> <span class="cls">dict</span>:
+    text = <span class="cls">str</span>(context_graph).strip()
+    kg_ok = <span class="str">"1"</span> <span class="kw">if</span> <span class="fn">len</span>(text) >= <span class="num">80</span> <span class="kw">else</span> <span class="str">"0"</span>
+    <span class="kw">return</span> {<span class="str">"kg_ok"</span>: kg_ok}</pre>
+      </div>
+      <div class="callout tip" style="margin-top:4px;">
+        <div class="icon">💡</div>
+        <div class="body">阈值 80 字符是经验值：KG 有效返回通常包含实体名、关系、描述，远超 80 字；空结果或"未找到"等占位符通常 &lt; 20 字。可按实际调整。</div>
+      </div>
+
+      <p style="margin-top:16px;"><strong>节点 2 — KG 结果检查器（IF 节点）</strong></p>
+      <div class="node-config">
+        <div class="nc-header"><span class="orange">IF</span>&nbsp;KG结果检查器</div>
+        <div class="nc-row"><div class="nc-key">条件（True）</div><div class="nc-val"><code>kg_ok == "1"</code> → 直连 ⑥ 答案合成器</div></div>
+        <div class="nc-row"><div class="nc-key">Else</div><div class="nc-val">→ 节点 3（知识库检索⑥.5）</div></div>
+      </div>
+
+      <p style="margin-top:16px;"><strong>节点 3 — 知识库检索⑥.5（Knowledge Base 节点）</strong></p>
+      <div class="node-config">
+        <div class="nc-header"><span class="purple">KB</span>&nbsp;知识库检索⑥.5</div>
+        <div class="nc-row"><div class="nc-key">知识库</div><div class="nc-val">选择前面创建的「教材知识库」</div></div>
+        <div class="nc-row"><div class="nc-key">查询输入</div><div class="nc-val"><code>user_query</code>（开始节点变量）</div></div>
+        <div class="nc-row"><div class="nc-key">返回分片数</div><div class="nc-val">5</div></div>
+        <div class="nc-row"><div class="nc-key">相似度阈值</div><div class="nc-val">0.5</div></div>
+        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>kb_chunks</code>（String）</div></div>
+      </div>
+      <p style="font-size:11px;color:var(--text-mid);margin-top:6px;">KB 节点之后接<strong>变量赋值节点</strong>：将 <code>kb_chunks</code> 赋值给全局变量 <code>kb_result_global</code>，再连到 ⑥ 答案合成器。</p>
+
+      <p style="margin-top:16px;"><strong>更新节点 ⑥ 答案合成器</strong></p>
+      <p style="font-size:12px;color:var(--text-mid);margin-bottom:6px;">新增输入变量：<code>kb_result_global</code>（全局变量，String）。替换原有 Prompt 为：</p>
+      <div class="prompt-box">
+<span class="p-cmt">你是知识图谱问答助手。优先基于知识图谱查询结果回答用户问题；当图谱信息不足时，结合教材原文补充。</span>
+
+用户问题：<span class="p-key">{{user_query}}</span>
+推理过程（共 <span class="p-key">{{hop_count}}</span> 跳）：<span class="p-key">{{context_graph}}</span>
+教材原文补充（向量检索）：<span class="p-key">{{kb_result_global}}</span>
+
+<span class="p-cmt">【数据结构说明】</span>
+context_graph 中每个实体的 properties 包含：
+- name：实体名称
+- description：实体基础描述
+- attributes：JSON 字符串，内含详细属性，如"特点"、"功能/作用"、"定义"、"类型"、"例子"、"背景/原因"、"统计口径"、"计算公式"等
+请充分利用 attributes 中的详细属性来丰富答案内容。
+
+<span class="p-cmt">要求：</span>
+- 直接回答问题，语言自然流畅
+- 若 context_graph 非空，以图谱推理结果为主要依据，引用 attributes 中相关属性
+- 若 context_graph 为空而 kb_result_global 非空，以教材原文为据作答，答案末注明「来源：教材原文」
+- 若两者均有内容，综合两种来源，图谱优先
+- 在答案末尾附上推理路径或来源标注：
+  图谱路径：「推理路径：实体A → 关系X → 实体B → 关系Y → 实体C」
+  教材来源：「来源：教材原文（向量检索）」
+- 若两者均为空，诚实说明未找到相关信息</div>
+
+      <p style="margin-top:16px;"><strong>连线增量</strong></p>
+      <table>
+        <tr><th>原连线</th><th>变更</th></tr>
+        <tr><td>循环节点 → ⑥ 答案合成器</td><td>改为：循环节点 → <strong>KG空值检测</strong></td></tr>
+        <tr><td>（新增）</td><td>KG空值检测 → KG结果检查器</td></tr>
+        <tr><td>（新增）</td><td>KG结果检查器 [True] → ⑥ 答案合成器</td></tr>
+        <tr><td>（新增）</td><td>KG结果检查器 [Else] → 知识库检索⑥.5 → 变量赋值 → ⑥ 答案合成器</td></tr>
+      </table>
+
+      <div class="callout success" style="margin-top:12px;">
+        <div class="icon">✅</div>
+        <div class="body"><strong>验证成功标志：</strong><br>
+        · 输入图谱中<strong>存在</strong>的实体问题 → 答案末尾为「推理路径：A → 关系 → B」<br>
+        · 输入图谱中<strong>不存在</strong>但教材中有的问题 → 调试日志显示 <code>kg_ok="0"</code>，KB 节点有返回，答案末含「来源：教材原文（向量检索）」</div>
+      </div>
+
+      <div class="callout warn" style="margin-top:8px;">
+        <div class="icon">⚠️</div>
+        <div class="body"><strong>测试建议：</strong>准备一个<strong>在图谱中不存在</strong>（MATCH 查询返回空）但教材中确实有对应段落的专业词汇来验证兜底路径。可在 Neo4j Browser 先查 <code>MATCH (n {name:"xxx"}) RETURN n</code> 确认图谱中无该节点，再用 Coze 调试面板测试该词汇，观察 <code>KG空值检测</code> 节点输出是否为 <code>"0"</code>。</div>
+      </div>
+
     </div>
   </div>
 </section>
@@ -1449,7 +1577,7 @@ context_graph 中每个实体的 properties 包含：
         <tr><td>工作流</td><td>多跳推理引擎</td><td>主要推理入口，Bot 会自动决定何时调用</td></tr>
         <tr><td>插件</td><td>KG查询服务 → fuzzySearch</td><td>单独暴露给 Bot，处理实体消歧</td></tr>
         <tr><td>插件</td><td>KG查询服务 → findPath</td><td>单独暴露，处理路径发现问题</td></tr>
-        <tr><td>知识库（可选）</td><td>上传教材 PDF 分段</td><td>图谱查询失败时的语义兜底</td></tr>
+        <tr><td>知识库（可选）</td><td>上传教材 PDF 分段</td><td>图谱查询失败时的语义兜底。<strong>⚠️ 若已配置 STEP 14+，此处留空</strong>，否则 Bot 层 RAG 提示词会干扰 Workflow 答案格式。</td></tr>
       </table>
       <div class="callout tip">
         <div class="icon">💡</div>
