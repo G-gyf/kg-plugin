@@ -74,14 +74,42 @@ const TOPIC_CLASS = {
   central:   'tag-central',
 };
 
+// ── 概念速查词条 ──────────────────────────────
+const CONCEPTS = [
+  '货币乘数', '公开市场操作', '存款准备金率', '菲利普斯曲线',
+  '泰勒规则', '流动性陷阱', '货币数量论', '利率平价',
+  '购买力平价', '货币政策传导', '通货膨胀目标制', '汇率制度',
+  '最优货币区', 'M1/M2', '货币创造',
+];
+
 // ── 初始化 ────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
   initCoze();
   renderQuestions('all');
   bindTagFilters();
   bindFeedback();
   checkHealth();
+  renderConcepts();
+  renderRecentQuestions();
 });
+
+// ── 深色模式 ──────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('kg_theme');
+  if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = saved === 'dark' ? '☀️' : '🌙';
+}
+
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? '' : 'dark');
+  localStorage.setItem('kg_theme', isDark ? 'light' : 'dark');
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = isDark ? '🌙' : '☀️';
+}
 
 // ── Coze SDK 初始化 ───────────────────────────
 async function initCoze() {
@@ -226,6 +254,8 @@ function sendToChat(question) {
       .then(() => showToast('已复制到剪贴板，请粘贴到对话框'))
       .catch(() => showToast('请手动复制：' + question));
   }
+  saveRecentQuestion(question);
+  renderRecentQuestions();
 }
 
 // ── 渲染示例问题卡片 ──────────────────────────
@@ -261,6 +291,40 @@ function renderQuestions(filterTopic) {
   if (filtered.length === 0) {
     list.innerHTML = '<div style="color:var(--text-dim);font-size:11px;padding:8px 0;">暂无该主题示例问题</div>';
   }
+
+  // 更新搜索计数并重新绑定搜索
+  updateQuestionCount();
+  bindSearch();
+}
+
+// ── 示例问题搜索 ──────────────────────────────
+function bindSearch() {
+  const input = document.getElementById('question-search');
+  if (!input) return;
+  // 替换旧监听（避免重复绑定）
+  const newInput = input.cloneNode(true);
+  input.parentNode.replaceChild(newInput, input);
+  newInput.addEventListener('input', () => {
+    const keyword = newInput.value.trim().toLowerCase();
+    const cards = document.querySelectorAll('#question-list .question-card');
+    let visible = 0;
+    cards.forEach(card => {
+      const text = card.querySelector('.question-text')?.textContent.toLowerCase() || '';
+      const match = !keyword || text.includes(keyword);
+      card.classList.toggle('hidden', !match);
+      if (match) visible++;
+    });
+    const countEl = document.getElementById('question-count');
+    if (countEl) {
+      countEl.textContent = keyword ? `${visible} / ${cards.length} 条` : `${cards.length} 条`;
+    }
+  });
+}
+
+function updateQuestionCount() {
+  const cards = document.querySelectorAll('#question-list .question-card');
+  const countEl = document.getElementById('question-count');
+  if (countEl) countEl.textContent = `${cards.length} 条`;
 }
 
 // ── 标签过滤 ──────────────────────────────────
@@ -269,6 +333,9 @@ function bindTagFilters() {
     tag.addEventListener('click', () => {
       document.querySelectorAll('.topic-tag').forEach(t => t.classList.remove('active'));
       tag.classList.add('active');
+      // 清空搜索框
+      const searchInput = document.getElementById('question-search');
+      if (searchInput) searchInput.value = '';
       renderQuestions(tag.dataset.topic);
     });
   });
@@ -302,6 +369,99 @@ function submitFeedback(vote) {
   } catch (e) {
     console.warn('localStorage write failed:', e);
   }
+}
+
+// ── 概念速查 ──────────────────────────────────
+function renderConcepts() {
+  const container = document.getElementById('concept-chips');
+  if (!container) return;
+  CONCEPTS.forEach(c => {
+    const chip = document.createElement('button');
+    chip.className = 'concept-chip';
+    chip.textContent = c;
+    chip.onclick = () => sendToChat(`请解释一下：${c}`);
+    container.appendChild(chip);
+  });
+}
+
+// ── 最近提问记录 ──────────────────────────────
+function saveRecentQuestion(text) {
+  try {
+    const list = JSON.parse(sessionStorage.getItem('kg_recent') || '[]');
+    list.unshift({ text, timestamp: new Date().toISOString() });
+    // 最多保留 10 条，去重（保留最新）
+    const seen = new Set();
+    const deduped = list.filter(item => {
+      if (seen.has(item.text)) return false;
+      seen.add(item.text);
+      return true;
+    }).slice(0, 10);
+    sessionStorage.setItem('kg_recent', JSON.stringify(deduped));
+  } catch (e) {
+    console.warn('sessionStorage write failed:', e);
+  }
+}
+
+function renderRecentQuestions() {
+  const card = document.getElementById('recent-card');
+  const listEl = document.getElementById('recent-list');
+  if (!card || !listEl) return;
+
+  let list = [];
+  try {
+    list = JSON.parse(sessionStorage.getItem('kg_recent') || '[]');
+  } catch (e) { /* ignore */ }
+
+  if (list.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = '';
+  listEl.innerHTML = '';
+
+  list.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'recent-item';
+
+    const timeStr = formatRecentTime(item.timestamp);
+
+    row.innerHTML = `
+      <span class="recent-item-text" title="${escapeHtml(item.text)}">${escapeHtml(item.text)}</span>
+      <span class="recent-item-time">${timeStr}</span>
+      <button class="recent-item-del" title="删除" aria-label="删除该记录">×</button>
+    `;
+
+    row.querySelector('.recent-item-text').addEventListener('click', () => sendToChat(item.text));
+    row.querySelector('.recent-item-del').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteRecentQuestion(idx);
+    });
+
+    listEl.appendChild(row);
+  });
+}
+
+function deleteRecentQuestion(idx) {
+  try {
+    const list = JSON.parse(sessionStorage.getItem('kg_recent') || '[]');
+    list.splice(idx, 1);
+    sessionStorage.setItem('kg_recent', JSON.stringify(list));
+  } catch (e) { /* ignore */ }
+  renderRecentQuestions();
+}
+
+function formatRecentTime(iso) {
+  try {
+    const d = new Date(iso);
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  } catch { return ''; }
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ── 健康状态检测 ──────────────────────────────
@@ -339,3 +499,6 @@ function showToast(msg) {
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 2800);
 }
+
+// [Phase 3] 用户登录后在此处显示 #user-area，绑定 userId 到反馈/记录数据
+// function initUserArea(userId) { ... }
