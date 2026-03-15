@@ -93,14 +93,21 @@ document.addEventListener('DOMContentLoaded', () => {
   checkHealth();
   renderConcepts();
   renderRecentQuestions();
+  initCollapsible();
 });
 
 // ── 深色模式 ──────────────────────────────────
 function initTheme() {
   const saved = localStorage.getItem('kg_theme');
-  if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  // Default: dark
+  const theme = saved !== null ? saved : 'dark';
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.setAttribute('data-theme', '');
+  }
   const btn = document.getElementById('theme-toggle');
-  if (btn) btn.textContent = saved === 'dark' ? '☀️' : '🌙';
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
 }
 
 function toggleTheme() {
@@ -268,9 +275,10 @@ function renderQuestions(filterTopic) {
     ? EXAMPLE_QUESTIONS
     : EXAMPLE_QUESTIONS.filter(q => q.topic === filterTopic);
 
-  filtered.forEach(q => {
+  filtered.forEach((q, idx) => {
     const card = document.createElement('div');
     card.className = 'question-card';
+    card.style.animationDelay = `${idx * 40}ms`;
     card.setAttribute('role', 'button');
     card.setAttribute('tabindex', '0');
     card.setAttribute('aria-label', '点击发送问题：' + q.text);
@@ -498,6 +506,16 @@ function showToast(msg) {
   toast.textContent = msg;
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 2800);
+}
+
+// ── 卡片折叠/展开 ─────────────────────────────
+function initCollapsible() {
+  document.querySelectorAll('.card.collapsible > .card-title').forEach(title => {
+    title.addEventListener('click', () => {
+      const card = title.closest('.card');
+      card.classList.toggle('collapsed');
+    });
+  });
 }
 
 // [Phase 3] 用户登录后在此处显示 #user-area，绑定 userId 到反馈/记录数据

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,11 +19,14 @@
 
 <!-- ── HEADER ── -->
 <header class="site-header">
-  <div class="header-logo">KG · 货币金融学</div>
+  <div class="header-logo">
+    <span class="header-logo-icon">⬡</span>
+    KG · 货币金融学
+  </div>
   <div class="header-subtitle">knowledge-graph / monetary-economics</div>
-  <!-- Phase 3 预留：用户登录区域，隐藏等待账号系统接入 -->
+  <!-- Phase 3 预留：用户登录区域 -->
   <div class="user-area" id="user-area" style="display:none"></div>
-  <button class="theme-toggle" id="theme-toggle" title="切换主题" aria-label="切换深色/浅色模式">🌙</button>
+  <button class="theme-toggle" id="theme-toggle" title="切换主题" aria-label="切换深色/浅色模式">☀️</button>
   <div class="header-status">
     <div class="status-dot" id="status-dot"></div>
     <span class="status-label" id="status-label">检测中…</span>
@@ -36,37 +39,48 @@
   <!-- ── LEFT PANEL ── -->
   <aside class="left-panel">
 
-    <!-- 知识领域标签 -->
-    <div class="card">
-      <div class="card-title">知识领域</div>
-      <div class="topic-tags">
-        <button class="topic-tag tag-all active" data-topic="all">全部</button>
-        <button class="topic-tag tag-policy"    data-topic="policy">货币政策</button>
-        <button class="topic-tag tag-inflation" data-topic="inflation">通货膨胀</button>
-        <button class="topic-tag tag-rate"      data-topic="rate">利率</button>
-        <button class="topic-tag tag-bank"      data-topic="bank">商业银行</button>
-        <button class="topic-tag tag-intl"      data-topic="intl">国际金融</button>
-        <button class="topic-tag tag-supply"    data-topic="supply">货币供给</button>
-        <button class="topic-tag tag-central"   data-topic="central">中央银行</button>
+    <!-- 知识领域标签（可折叠） -->
+    <div class="card collapsible">
+      <div class="card-title">
+        知识领域
+        <span class="chevron">›</span>
+      </div>
+      <div class="card-body">
+        <div class="topic-tags">
+          <button class="topic-tag tag-all active" data-topic="all">全部</button>
+          <button class="topic-tag tag-policy"    data-topic="policy">货币政策</button>
+          <button class="topic-tag tag-inflation" data-topic="inflation">通货膨胀</button>
+          <button class="topic-tag tag-rate"      data-topic="rate">利率</button>
+          <button class="topic-tag tag-bank"      data-topic="bank">商业银行</button>
+          <button class="topic-tag tag-intl"      data-topic="intl">国际金融</button>
+          <button class="topic-tag tag-supply"    data-topic="supply">货币供给</button>
+          <button class="topic-tag tag-central"   data-topic="central">中央银行</button>
+        </div>
       </div>
     </div>
 
-    <!-- 示例问题 -->
-    <div class="card">
-      <div class="card-title">示例问题</div>
-      <div class="question-search-wrap">
-        <input id="question-search" class="question-search" placeholder="搜索问题…" type="text" autocomplete="off">
-        <span class="question-count" id="question-count"></span>
+    <!-- 示例问题（可折叠） -->
+    <div class="card collapsible">
+      <div class="card-title">
+        示例问题
+        <span class="chevron">›</span>
       </div>
-      <div class="question-list" id="question-list">
-        <!-- 由 app.js 动态渲染 -->
+      <div class="card-body">
+        <div class="question-search-wrap">
+          <input id="question-search" class="question-search" placeholder="搜索问题…" type="text" autocomplete="off">
+          <span class="question-count" id="question-count"></span>
+        </div>
+        <div class="question-list" id="question-list">
+          <!-- 由 app.js 动态渲染 -->
+        </div>
       </div>
     </div>
 
   </aside>
 
-  <!-- ── RIGHT PANEL (Chat + Below-cards) ── -->
+  <!-- ── RIGHT PANEL ── -->
   <section class="right-panel">
+
     <!-- 降级界面：SDK 失败时显示 -->
     <div class="chat-launch" id="chat-launch" style="display:none">
       <div class="chat-launch-icon">💬</div>
@@ -74,6 +88,7 @@
       <div class="chat-launch-desc">基于知识图谱，涵盖货币政策、利率、银行体系、国际金融等核心概念</div>
       <button class="chat-launch-btn" id="chat-launch-btn" onclick="openCozeChat()">开始对话</button>
     </div>
+
     <div class="chat-wrapper" id="chat-wrapper" style="display:none">
       <!-- 顶部切换栏 -->
       <div class="chat-toggle-bar" id="chat-toggle-bar">
@@ -84,91 +99,116 @@
       <div id="chat-container"></div>
     </div>
 
-    <!-- 聊天框下方 4 列卡片 -->
+    <!-- 聊天框下方 2×2 卡片 -->
     <div class="below-chat-cards">
 
-      <!-- 提问技巧 -->
-      <div class="card">
-        <div class="card-title">提问技巧</div>
-        <div class="tips-list">
-          <div class="tip-item">
-            <span class="tip-icon">🎯</span>
-            <span><strong>具体概念</strong>：直接问"XX是什么"比问"帮我学习货币学"效果更好</span>
-          </div>
-          <div class="tip-item">
-            <span class="tip-icon">🔗</span>
-            <span><strong>关系推理</strong>：问"A对B有什么影响"可触发知识图谱多跳推理</span>
-          </div>
-          <div class="tip-item">
-            <span class="tip-icon">📊</span>
-            <span><strong>举例对比</strong>：加上"举例说明"或"与XX相比"可获得更丰富解释</span>
-          </div>
-          <div class="tip-item">
-            <span class="tip-icon">🌍</span>
-            <span><strong>联系实际</strong>：结合"中国/美国当前政策"可获得更贴近现实的分析</span>
+      <!-- 提问技巧（可折叠） -->
+      <div class="card collapsible">
+        <div class="card-title">
+          提问技巧
+          <span class="chevron">›</span>
+        </div>
+        <div class="card-body">
+          <div class="tips-list">
+            <div class="tip-item">
+              <span class="tip-icon">🎯</span>
+              <span><strong>具体概念</strong>：直接问"XX是什么"比问"帮我学习货币学"效果更好</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-icon">🔗</span>
+              <span><strong>关系推理</strong>：问"A对B有什么影响"可触发知识图谱多跳推理</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-icon">📊</span>
+              <span><strong>举例对比</strong>：加上"举例说明"或"与XX相比"可获得更丰富解释</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-icon">🌍</span>
+              <span><strong>联系实际</strong>：结合"中国/美国当前政策"可获得更贴近现实的分析</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 答案质量反馈 -->
-      <div class="card">
-        <div class="card-title">答案质量反馈</div>
-        <div class="feedback-row">
-          <span class="feedback-label">本次对话答案是否有帮助？</span>
-          <div class="feedback-btns">
-            <button class="feedback-btn up"   data-vote="up">👍 有帮助</button>
-            <button class="feedback-btn down" data-vote="down">👎 待改进</button>
+      <!-- 答案质量反馈（可折叠） -->
+      <div class="card collapsible">
+        <div class="card-title">
+          答案质量反馈
+          <span class="chevron">›</span>
+        </div>
+        <div class="card-body">
+          <div class="feedback-row">
+            <span class="feedback-label">本次对话答案是否有帮助？</span>
+            <div class="feedback-btns">
+              <button class="feedback-btn up"   data-vote="up">👍 有帮助</button>
+              <button class="feedback-btn down" data-vote="down">👎 待改进</button>
+            </div>
+            <span class="feedback-thanks" id="feedback-thanks">感谢反馈！</span>
           </div>
-          <span class="feedback-thanks" id="feedback-thanks">感谢反馈！</span>
         </div>
       </div>
 
-      <!-- 知识资料库 -->
-      <div class="card">
-        <div class="card-title">知识资料库</div>
-        <div class="resource-list">
-          <a class="resource-item" href="#" title="货币政策概论">
-            <span class="resource-icon">📄</span>
-            <span>货币政策概论</span>
-            <span class="resource-tag">PDF</span>
-          </a>
-          <a class="resource-item" href="#" title="利率理论与实践">
-            <span class="resource-icon">📄</span>
-            <span>利率理论与实践</span>
-            <span class="resource-tag">PDF</span>
-          </a>
-          <a class="resource-item" href="#" title="国际金融体系">
-            <span class="resource-icon">📄</span>
-            <span>国际金融体系</span>
-            <span class="resource-tag">PDF</span>
-          </a>
-          <a class="resource-item" href="#" title="商业银行学">
-            <span class="resource-icon">📄</span>
-            <span>商业银行学</span>
-            <span class="resource-tag">PDF</span>
-          </a>
-          <a class="resource-item" href="#" title="中央银行学">
-            <span class="resource-icon">📄</span>
-            <span>中央银行学</span>
-            <span class="resource-tag">PDF</span>
-          </a>
+      <!-- 知识资料库（可折叠） -->
+      <div class="card collapsible">
+        <div class="card-title">
+          知识资料库
+          <span class="chevron">›</span>
+        </div>
+        <div class="card-body">
+          <div class="resource-list">
+            <a class="resource-item" href="#" title="货币政策概论">
+              <span class="resource-icon">📄</span>
+              <span>货币政策概论</span>
+              <span class="resource-tag">PDF</span>
+            </a>
+            <a class="resource-item" href="#" title="利率理论与实践">
+              <span class="resource-icon">📄</span>
+              <span>利率理论与实践</span>
+              <span class="resource-tag">PDF</span>
+            </a>
+            <a class="resource-item" href="#" title="国际金融体系">
+              <span class="resource-icon">📄</span>
+              <span>国际金融体系</span>
+              <span class="resource-tag">PDF</span>
+            </a>
+            <a class="resource-item" href="#" title="商业银行学">
+              <span class="resource-icon">📄</span>
+              <span>商业银行学</span>
+              <span class="resource-tag">PDF</span>
+            </a>
+            <a class="resource-item" href="#" title="中央银行学">
+              <span class="resource-icon">📄</span>
+              <span>中央银行学</span>
+              <span class="resource-tag">PDF</span>
+            </a>
+          </div>
         </div>
       </div>
 
-      <!-- 概念速查 -->
-      <div class="card">
-        <div class="card-title">概念速查</div>
-        <div class="concept-chips" id="concept-chips">
-          <!-- 由 app.js 渲染 -->
+      <!-- 概念速查（可折叠） -->
+      <div class="card collapsible">
+        <div class="card-title">
+          概念速查
+          <span class="chevron">›</span>
+        </div>
+        <div class="card-body">
+          <div class="concept-chips" id="concept-chips">
+            <!-- 由 app.js 渲染 -->
+          </div>
         </div>
       </div>
 
     </div><!-- /.below-chat-cards -->
 
-    <!-- 最近提问记录（有记录时显示） -->
-    <div class="card recent-questions-card" id="recent-card" style="display:none">
-      <div class="card-title">最近提问</div>
-      <div class="recent-list" id="recent-list"></div>
+    <!-- 最近提问记录（有记录时显示，可折叠） -->
+    <div class="card collapsible recent-questions-card" id="recent-card" style="display:none">
+      <div class="card-title">
+        最近提问
+        <span class="chevron">›</span>
+      </div>
+      <div class="card-body">
+        <div class="recent-list" id="recent-list"></div>
+      </div>
     </div>
 
   </section>
