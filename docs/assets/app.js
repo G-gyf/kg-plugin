@@ -11,7 +11,7 @@ let chatClient = null;
 let sdkBtnRef  = null;   // SDK 创建的 asstBtn 引用（MO 捕获后隐藏）
 let chatOpen   = false;
 
-// ── 示例问题数组 ──────────────────────────────
+// ── 常见问题数组 ──────────────────────────────
 const EXAMPLE_QUESTIONS = [
   {
     topic: 'policy',
@@ -164,7 +164,21 @@ async function initCoze() {
       },
     });
     // 短暂 delay 确保 SDK 完成内部 mount
-    setTimeout(() => openCozeChat(), 300);
+    setTimeout(() => {
+      // 新标签页/窗口打开时重置会话（sessionStorage 关闭标签后清空）
+      const isNewSession = !sessionStorage.getItem('coze_session_active');
+      if (isNewSession) {
+        sessionStorage.setItem('coze_session_active', '1');
+        // 清除 Coze SDK 写入的会话数据（不影响 kg_feedback 等自有键）
+        Object.keys(localStorage)
+          .filter(k => k.toLowerCase().includes('coze') || k.toLowerCase().includes('conversation'))
+          .forEach(k => localStorage.removeItem(k));
+        if (typeof chatClient.createConversation === 'function') {
+          chatClient.createConversation();
+        }
+      }
+      openCozeChat();
+    }, 300);
   } catch (e) {
     console.error('CozeWebSDK init error:', e);
     // 失败降级：显示启动卡片，按钮改为"重试连接"
@@ -253,6 +267,7 @@ function updateToggleBtn(open) {
 // ── 发送到聊天框（带剪贴板降级）────────────────
 function sendToChat(question) {
   if (chatClient && typeof chatClient.sendMessage === 'function') {
+    if (!chatOpen) openCozeChat();          // 确保聊天框已打开
     chatClient.sendMessage({ content: question });
     document.getElementById('chat-container')
       .scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -265,7 +280,7 @@ function sendToChat(question) {
   renderRecentQuestions();
 }
 
-// ── 渲染示例问题卡片 ──────────────────────────
+// ── 渲染常见问题卡片 ──────────────────────────
 function renderQuestions(filterTopic) {
   const list = document.getElementById('question-list');
   if (!list) return;
@@ -297,7 +312,7 @@ function renderQuestions(filterTopic) {
   });
 
   if (filtered.length === 0) {
-    list.innerHTML = '<div style="color:var(--text-dim);font-size:11px;padding:8px 0;">暂无该主题示例问题</div>';
+    list.innerHTML = '<div style="color:var(--text-dim);font-size:11px;padding:8px 0;">暂无该主题常见问题</div>';
   }
 
   // 更新搜索计数并重新绑定搜索
@@ -305,7 +320,7 @@ function renderQuestions(filterTopic) {
   bindSearch();
 }
 
-// ── 示例问题搜索 ──────────────────────────────
+// ── 常见问题搜索 ──────────────────────────────
 function bindSearch() {
   const input = document.getElementById('question-search');
   if (!input) return;
