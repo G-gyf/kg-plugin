@@ -179,16 +179,6 @@ async function initCoze() {
         footer: { isShow: false },
       },
     });
-    // 新标签页：尝试通过 API 主动创建新会话（覆盖 SDK 持久化的旧 conversation_id）
-    if (isNewTab && typeof chatClient.createConversation === 'function') {
-      try {
-        await chatClient.createConversation();
-        console.log('[kg] createConversation() succeeded');
-      } catch (e) {
-        console.warn('[kg] createConversation() failed (non-fatal):', e);
-      }
-    }
-
     // 短暂 delay 确保 SDK 完成内部 mount
     setTimeout(() => {
       openCozeChat();
@@ -208,25 +198,14 @@ async function initCoze() {
 
 // ── 清除 Coze SDK 缓存的 conversation（新标签页调用）──
 function _clearCozeConversationCache() {
-  // SDK 在 localStorage 中以 bot_id 或 "coze"/"conversation" 为前缀存储会话
-  const BOT_ID = '7613708062620696585';
-  const patterns = ['coze', 'conversation', BOT_ID, 'chat_', 'session_'];
-  const toDelete = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key) continue;
-    const lower = key.toLowerCase();
-    if (patterns.some(p => lower.includes(p.toLowerCase()))) {
-      toDelete.push(key);
+  // 精确删除 ByteDance WebSDK 安装 ID（Coze 服务端用此 key 关联会话）
+  const COZE_KEYS = ['websdk_ng_install_id'];
+  COZE_KEYS.forEach(k => {
+    if (localStorage.getItem(k) !== null) {
+      console.log('[kg] clearing Coze cache key:', k);
+      localStorage.removeItem(k);
     }
-  }
-  toDelete.forEach(k => {
-    console.log('[kg] clearing Coze cache key:', k);
-    localStorage.removeItem(k);
   });
-  if (toDelete.length === 0) {
-    console.log('[kg] no Coze cache keys found in localStorage');
-  }
 }
 
 // ── 捕获 SDK 浮钮容器（监听 body 直接子节点）──
@@ -301,37 +280,6 @@ function updateToggleBtn(open) {
   if (btn) btn.textContent = open ? '关闭对话' : '打开对话';
 }
 
-// ── 尝试多种 sendMessage 格式（兼容不同 SDK 版本）─────
-function _trySdkSend(question) {
-  if (!chatClient || typeof chatClient.sendMessage !== 'function') return false;
-
-  // 格式 1：{ content }（beta.10 文档格式）
-  try {
-    chatClient.sendMessage({ content: question });
-    return true;
-  } catch (e1) {
-    console.warn('[kg] sendMessage({content}) threw:', e1);
-  }
-
-  // 格式 2：纯字符串
-  try {
-    chatClient.sendMessage(question);
-    return true;
-  } catch (e2) {
-    console.warn('[kg] sendMessage(string) threw:', e2);
-  }
-
-  // 格式 3：{ type, content }
-  try {
-    chatClient.sendMessage({ type: 'text', content: question });
-    return true;
-  } catch (e3) {
-    console.warn('[kg] sendMessage({type,content}) threw:', e3);
-  }
-
-  return false;
-}
-
 // ── DOM 降级：模拟输入 + 回车（ErrorBoundary 兜底）──
 function _sendViaDom(text) {
   const selectors = [
@@ -367,27 +315,17 @@ function _sendViaDom(text) {
 function sendToChat(question) {
   if (chatClient) {
     const doSend = () => {
-      const sdkOk = _trySdkSend(question);
-      if (!sdkOk) {
-        console.warn('[kg] SDK send failed, trying DOM fallback');
-        const domOk = _sendViaDom(question);
-        if (!domOk) {
-          navigator.clipboard.writeText(question)
-            .then(() => showToast('已复制到剪贴板，请粘贴到对话框'))
-            .catch(() => showToast('请手动复制：' + question));
-        }
+      const ok = _sendViaDom(question);
+      if (!ok) {
+        navigator.clipboard.writeText(question)
+          .then(() => showToast('已复制到剪贴板，请粘贴到对话框'))
+          .catch(() => showToast('请手动复制：' + question));
       }
       document.getElementById('chat-container')
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
-
-    if (!chatOpen) {
-      openCozeChat();
-      // 等待聊天框挂载完成后再发送（SDK showChatBot 是异步的）
-      setTimeout(doSend, 600);
-    } else {
-      doSend();
-    }
+    if (!chatOpen) { openCozeChat(); setTimeout(doSend, 600); }
+    else { doSend(); }
   } else {
     navigator.clipboard.writeText(question)
       .then(() => showToast('已复制到剪贴板，请粘贴到对话框'))

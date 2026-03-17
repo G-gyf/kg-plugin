@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "WebFetch(domain:unpkg.com)",
+      "WebFetch(domain:app.unpkg.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:docs.coze.cn)",
+      "WebFetch(domain:web.archive.org)",
+      "WebFetch(domain:www.coze.com)",
+      "WebFetch(domain:en.1991421.cn)",
+      "WebSearch",
+      "WebFetch(domain:blog.csdn.net)"
+    ]
+  }
+}
