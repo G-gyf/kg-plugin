@@ -140,11 +140,14 @@ async function initCoze() {
   // 每个标签页生成一次 user_id（sessionStorage 关闭标签后自动清空）
   // 关闭标签重开 → 新 UUID → SDK 创建全新会话；刷新 → 保留同一 UUID → 继续会话
   let sessionUserId = sessionStorage.getItem('coze_user_id');
-  if (!sessionUserId) {
+  const isNewTab = !sessionUserId;
+  if (isNewTab) {
     sessionUserId = crypto.randomUUID
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2) + Date.now().toString(36);
     sessionStorage.setItem('coze_user_id', sessionUserId);
+    // 新标签页：清除 SDK 缓存的 conversation_id，确保会话不延续
+    _clearCozeConversationCache();
   }
 
   try {
@@ -176,6 +179,16 @@ async function initCoze() {
         footer: { isShow: false },
       },
     });
+    // 新标签页：尝试通过 API 主动创建新会话（覆盖 SDK 持久化的旧 conversation_id）
+    if (isNewTab && typeof chatClient.createConversation === 'function') {
+      try {
+        await chatClient.createConversation();
+        console.log('[kg] createConversation() succeeded');
+      } catch (e) {
+        console.warn('[kg] createConversation() failed (non-fatal):', e);
+      }
+    }
+
     // 短暂 delay 确保 SDK 完成内部 mount
     setTimeout(() => {
       openCozeChat();
@@ -190,6 +203,29 @@ async function initCoze() {
       launchBtn.textContent = '重试连接';
       launchBtn.onclick = () => { launchEl.style.display = 'none'; initCoze(); };
     }
+  }
+}
+
+// ── 清除 Coze SDK 缓存的 conversation（新标签页调用）──
+function _clearCozeConversationCache() {
+  // SDK 在 localStorage 中以 bot_id 或 "coze"/"conversation" 为前缀存储会话
+  const BOT_ID = '7613708062620696585';
+  const patterns = ['coze', 'conversation', BOT_ID, 'chat_', 'session_'];
+  const toDelete = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    const lower = key.toLowerCase();
+    if (patterns.some(p => lower.includes(p.toLowerCase()))) {
+      toDelete.push(key);
+    }
+  }
+  toDelete.forEach(k => {
+    console.log('[kg] clearing Coze cache key:', k);
+    localStorage.removeItem(k);
+  });
+  if (toDelete.length === 0) {
+    console.log('[kg] no Coze cache keys found in localStorage');
   }
 }
 
@@ -265,21 +301,92 @@ function updateToggleBtn(open) {
   if (btn) btn.textContent = open ? '关闭对话' : '打开对话';
 }
 
+// ── 尝试多种 sendMessage 格式（兼容不同 SDK 版本）─────
+function _trySdkSend(question) {
+  if (!chatClient || typeof chatClient.sendMessage !== 'function') return false;
+
+  // 格式 1：{ content }（beta.10 文档格式）
+  try {
+    chatClient.sendMessage({ content: question });
+    return true;
+  } catch (e1) {
+    console.warn('[kg] sendMessage({content}) threw:', e1);
+  }
+
+  // 格式 2：纯字符串
+  try {
+    chatClient.sendMessage(question);
+    return true;
+  } catch (e2) {
+    console.warn('[kg] sendMessage(string) threw:', e2);
+  }
+
+  // 格式 3：{ type, content }
+  try {
+    chatClient.sendMessage({ type: 'text', content: question });
+    return true;
+  } catch (e3) {
+    console.warn('[kg] sendMessage({type,content}) threw:', e3);
+  }
+
+  return false;
+}
+
+// ── DOM 降级：模拟输入 + 回车（ErrorBoundary 兜底）──
+function _sendViaDom(text) {
+  const selectors = [
+    '[class*="chat"] textarea',
+    '[class*="chat"] input[type="text"]',
+    '#chat-container textarea',
+    '#chat-container input[type="text"]',
+    'textarea',
+  ];
+  for (const sel of selectors) {
+    const input = document.querySelector(sel);
+    if (!input) continue;
+    try {
+      const proto = input.tagName === 'TEXTAREA'
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+      const nativeSet = Object.getOwnPropertyDescriptor(proto, 'value');
+      if (nativeSet) nativeSet.set.call(input, text);
+      else input.value = text;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keyup',  { key: 'Enter', keyCode: 13, bubbles: true }));
+      console.log('[kg] DOM send via:', sel);
+      return true;
+    } catch (e) {
+      console.warn('[kg] DOM send failed for', sel, e);
+    }
+  }
+  return false;
+}
+
 // ── 发送到聊天框（带剪贴板降级）────────────────
 function sendToChat(question) {
-  if (chatClient && typeof chatClient.sendMessage === 'function') {
+  if (chatClient) {
+    const doSend = () => {
+      const sdkOk = _trySdkSend(question);
+      if (!sdkOk) {
+        console.warn('[kg] SDK send failed, trying DOM fallback');
+        const domOk = _sendViaDom(question);
+        if (!domOk) {
+          navigator.clipboard.writeText(question)
+            .then(() => showToast('已复制到剪贴板，请粘贴到对话框'))
+            .catch(() => showToast('请手动复制：' + question));
+        }
+      }
+      document.getElementById('chat-container')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
     if (!chatOpen) {
       openCozeChat();
       // 等待聊天框挂载完成后再发送（SDK showChatBot 是异步的）
-      setTimeout(() => {
-        chatClient.sendMessage({ content: question });
-        document.getElementById('chat-container')
-          .scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 600);
+      setTimeout(doSend, 600);
     } else {
-      chatClient.sendMessage({ content: question });
-      document.getElementById('chat-container')
-        .scrollIntoView({ behavior: 'smooth', block: 'start' });
+      doSend();
     }
   } else {
     navigator.clipboard.writeText(question)
