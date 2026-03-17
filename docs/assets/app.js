@@ -137,11 +137,24 @@ async function initCoze() {
     return;
   }
 
+  // 每个标签页生成一次 user_id（sessionStorage 关闭标签后自动清空）
+  // 关闭标签重开 → 新 UUID → SDK 创建全新会话；刷新 → 保留同一 UUID → 继续会话
+  let sessionUserId = sessionStorage.getItem('coze_user_id');
+  if (!sessionUserId) {
+    sessionUserId = crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem('coze_user_id', sessionUserId);
+  }
+
   try {
     watchForSdkBtn();   // 必须在构造之前设好，SDK 构造时同步插入容器
     chatClient = new CozeWebSDK.WebChatClient({
       config: {
         bot_id: '7613708062620696585',
+      },
+      user: {
+        user_id: sessionUserId,   // 绑定会话到标签页级别
       },
       auth: {
         type: 'token',
@@ -165,18 +178,6 @@ async function initCoze() {
     });
     // 短暂 delay 确保 SDK 完成内部 mount
     setTimeout(() => {
-      // 新标签页/窗口打开时重置会话（sessionStorage 关闭标签后清空）
-      const isNewSession = !sessionStorage.getItem('coze_session_active');
-      if (isNewSession) {
-        sessionStorage.setItem('coze_session_active', '1');
-        // 清除 Coze SDK 写入的会话数据（不影响 kg_feedback 等自有键）
-        Object.keys(localStorage)
-          .filter(k => k.toLowerCase().includes('coze') || k.toLowerCase().includes('conversation'))
-          .forEach(k => localStorage.removeItem(k));
-        if (typeof chatClient.createConversation === 'function') {
-          chatClient.createConversation();
-        }
-      }
       openCozeChat();
     }, 300);
   } catch (e) {
@@ -267,10 +268,19 @@ function updateToggleBtn(open) {
 // ── 发送到聊天框（带剪贴板降级）────────────────
 function sendToChat(question) {
   if (chatClient && typeof chatClient.sendMessage === 'function') {
-    if (!chatOpen) openCozeChat();          // 确保聊天框已打开
-    chatClient.sendMessage({ content: question });
-    document.getElementById('chat-container')
-      .scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!chatOpen) {
+      openCozeChat();
+      // 等待聊天框挂载完成后再发送（SDK showChatBot 是异步的）
+      setTimeout(() => {
+        chatClient.sendMessage({ content: question });
+        document.getElementById('chat-container')
+          .scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 600);
+    } else {
+      chatClient.sendMessage({ content: question });
+      document.getElementById('chat-container')
+        .scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   } else {
     navigator.clipboard.writeText(question)
       .then(() => showToast('已复制到剪贴板，请粘贴到对话框'))
