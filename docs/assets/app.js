@@ -94,6 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderConcepts();
   renderRecentQuestions();
   initCollapsible();
+  initWelcomeBanner();
+  initActionBar();
 });
 
 // ── 深色模式 ──────────────────────────────────
@@ -576,6 +578,45 @@ function showToast(msg) {
   toast.textContent = msg;
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 2800);
+}
+
+// ── 欢迎横幅 ──────────────────────────────────
+function initWelcomeBanner() {
+  const banner = document.getElementById('welcome-banner');
+  const dismissBtn = document.getElementById('welcome-dismiss');
+  if (!banner || !dismissBtn) return;
+  if (localStorage.getItem('kg_welcome_dismissed') === '1') {
+    banner.style.display = 'none';
+    return;
+  }
+  dismissBtn.addEventListener('click', () => {
+    banner.style.display = 'none';
+    localStorage.setItem('kg_welcome_dismissed', '1');
+  });
+}
+
+// ── 动作栏 ────────────────────────────────────
+function initActionBar() {
+  const tabs = document.querySelectorAll('.action-tab');
+  const panel = document.getElementById('action-panel');
+  if (!tabs.length || !panel) return;
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const panelId = 'ap-' + tab.dataset.panel;
+      const isAlreadyActive = tab.classList.contains('active');
+      tabs.forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.action-panel-content').forEach(c => c.classList.remove('active'));
+      if (isAlreadyActive) {
+        panel.classList.remove('open');
+      } else {
+        tab.classList.add('active');
+        const content = document.getElementById(panelId);
+        if (content) content.classList.add('active');
+        panel.classList.add('open');
+      }
+    });
+  });
 }
 
 // ── 卡片折叠/展开 ─────────────────────────────
