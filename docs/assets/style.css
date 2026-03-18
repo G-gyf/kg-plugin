@@ -7,18 +7,18 @@
 
 /* ── DESIGN TOKENS ─────────────────────────────── */
 :root {
-  --bg: #f7f3ee; --bg2: #fefdfb; --panel: #ffffff; --panel2: #f4efe8;
-  --border: #e8ddd0; --border2: #d6c8b8;
-  --amber: #c2510e; --amber-dim: rgba(194,81,14,0.08); --amber-glow: rgba(194,81,14,0.20);
-  --teal: #0f7a6c; --teal-dim: rgba(15,122,108,0.09);
-  --green: #15803d; --green-glow: rgba(21,128,61,0.22); --red: #c4262c;
-  --text: #1a1208; --text-mid: #6b5b4e; --text-dim: #b0a09a;
+  --bg: #edf1f8; --bg2: #ffffff; --panel: #ffffff; --panel2: #f3f6fc;
+  --border: #dce3ee; --border2: #c2cedc;
+  --amber: #d97706; --amber-dim: rgba(217,119,6,0.08); --amber-glow: rgba(217,119,6,0.22);
+  --teal: #0891b2; --teal-dim: rgba(8,145,178,0.09);
+  --green: #059669; --green-glow: rgba(5,150,105,0.22); --red: #dc2626;
+  --text: #0c1929; --text-mid: #4a6278; --text-dim: #8da4b8;
   --c-policy: #b45309; --c-inflation: #c21858; --c-rate: #7c3aed;
   --c-bank: #0e7490; --c-intl: #166534; --c-supply: #0369a1; --c-central: #1d4ed8;
   --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
   --ease: cubic-bezier(0.16,1,0.3,1); --ease-back: cubic-bezier(0.34,1.56,0.64,1);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06); --shadow-md: 0 4px 14px rgba(0,0,0,0.09);
-  --shadow-lg: 0 8px 28px rgba(0,0,0,0.11); --dot-color: rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,0.11); --dot-color: rgba(0,0,0,0.048);
 }
 
 [data-theme="dark"] {
