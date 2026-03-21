@@ -376,10 +376,12 @@ async def get_logs(limit: int = 50):
 async def get_coze_session_token(session_name: str):
     """为每个标签页签发 JWT OAuth token，session_name 隔离会话历史。"""
     client_id = os.environ.get("COZE_CLIENT_ID", "")
-    private_key = os.environ.get("COZE_PRIVATE_KEY", "")
+    private_key = os.environ.get("COZE_PRIVATE_KEY", "").replace("\\n", "\n")
     public_key_id = os.environ.get("COZE_PUBLIC_KEY_ID", "")
     if not all([client_id, private_key, public_key_id]):
         raise HTTPException(status_code=503, detail="Coze OAuth not configured")
+
+    logging.info(f"[coze-jwt] client_id={client_id} kid={public_key_id} key_starts={private_key[:40]!r}")
 
     now = int(time.time())
     payload = {
@@ -391,6 +393,7 @@ async def get_coze_session_token(session_name: str):
         "session_name": session_name,
     }
     signed_jwt = pyjwt.encode(payload, private_key, algorithm="RS256", headers={"kid": public_key_id})
+    logging.info(f"[coze-jwt] signed JWT (first 60): {signed_jwt[:60]}")
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -403,6 +406,7 @@ async def get_coze_session_token(session_name: str):
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             timeout=10,
         )
+    logging.info(f"[coze-jwt] Coze response {resp.status_code}: {resp.text}")
     data = resp.json()
     access_token = data.get("access_token")
     if not access_token:
