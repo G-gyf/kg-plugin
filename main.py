@@ -388,9 +388,8 @@ async def get_coze_session_token(session_name: str):
         "iss": client_id,
         "aud": "api.coze.cn",
         "iat": now,
-        "exp": now + 3600,
+        "exp": now + 900,
         "jti": str(uuid.uuid4()),
-        "session_name": session_name,
     }
     signed_jwt = pyjwt.encode(payload, private_key, algorithm="RS256", headers={"kid": public_key_id})
     logging.info(f"[coze-jwt] signed JWT (first 60): {signed_jwt[:60]}")
@@ -402,6 +401,7 @@ async def get_coze_session_token(session_name: str):
                 "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
                 "duration_seconds": "3600",
                 "assertion": signed_jwt,
+                "session_name": session_name,
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             timeout=10,
