@@ -229,7 +229,7 @@ function _clearCozeConversationCache() {
   }
   console.log('[kg-debug] Coze-related localStorage keys found:', cozeRelated);
 
-  const COZE_KEYS = ['websdk_ng_install_id'];
+  const COZE_KEYS = ['websdk_ng_install_id', 'SLARDARbot_studio_sdk'];
   COZE_KEYS.forEach(k => {
     if (localStorage.getItem(k) !== null) {
       console.log('[kg-debug] CLEARING key:', k);
