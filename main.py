@@ -17,8 +17,8 @@ import json
 from datetime import datetime
 from dotenv import load_dotenv
 import httpx
-import jwt as pyjwt
 import uuid
+from cozepy import JWTOAuthApp, COZE_CN_BASE_URL
 
 load_dotenv()
 
@@ -373,45 +373,32 @@ async def get_logs(limit: int = 50):
 # ─────────────────────────────────────────
 
 @app.get("/coze-session-token")
-async def get_coze_session_token(session_name: str):
+def get_coze_session_token(session_name: str):
     """为每个标签页签发 JWT OAuth token，session_name 隔离会话历史。"""
     client_id = os.environ.get("COZE_CLIENT_ID", "")
+    # Railway 存储的私钥保留原始 \n 两字符，这里转为实际换行
     private_key = os.environ.get("COZE_PRIVATE_KEY", "").replace("\\n", "\n")
     public_key_id = os.environ.get("COZE_PUBLIC_KEY_ID", "")
     if not all([client_id, private_key, public_key_id]):
         raise HTTPException(status_code=503, detail="Coze OAuth not configured")
 
-    logging.info(f"[coze-jwt] client_id={client_id} kid={public_key_id} key_starts={private_key[:40]!r}")
-
-    now = int(time.time())
-    payload = {
-        "iss": client_id,
-        "aud": "api.coze.cn",
-        "iat": now,
-        "exp": now + 900,
-        "jti": str(uuid.uuid4()),
+    config = {
+        "client_type": "jwt",
+        "client_id": client_id,
+        "coze_www_base": "https://www.coze.cn",
+        "coze_api_base": "https://api.coze.cn",
+        "private_key": private_key,
+        "public_key_id": public_key_id,
     }
-    signed_jwt = pyjwt.encode(payload, private_key, algorithm="RS256", headers={"kid": public_key_id})
-    logging.info(f"[coze-jwt] signed JWT (first 60): {signed_jwt[:60]}")
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            "https://api.coze.cn/api/permission/oauth2/token",
-            data={
-                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
-                "duration_seconds": "3600",
-                "assertion": signed_jwt,
-                "session_name": session_name,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=10,
-        )
-    logging.info(f"[coze-jwt] Coze response {resp.status_code}: {resp.text}")
-    data = resp.json()
-    access_token = data.get("access_token")
-    if not access_token:
-        raise HTTPException(status_code=502, detail=f"Token exchange failed: {data}")
-    return {"token": access_token}
+    try:
+        from cozepy import load_oauth_app_from_config
+        jwt_app = load_oauth_app_from_config(config)
+        oauth_token = jwt_app.get_access_token(ttl=3600, session_name=session_name)
+        logging.info(f"[coze-jwt] token ok, expires_in={oauth_token.expires_in}")
+        return {"token": oauth_token.access_token}
+    except Exception as e:
+        logging.error(f"[coze-jwt] error: {e}")
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 # ─────────────────────────────────────────
