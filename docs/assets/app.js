@@ -128,6 +128,14 @@ async function initCoze() {
     return;
   }
 
+  // DEBUG: snapshot localStorage before any clearing
+  const lsSnapshot = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    lsSnapshot[k] = localStorage.getItem(k);
+  }
+  console.log('[kg-debug] localStorage ON LOAD:', lsSnapshot);
+
   // 从后端获取 token，PAT 不暴露在前端源码中
   let token;
   try {
@@ -143,6 +151,7 @@ async function initCoze() {
   // 关闭标签重开 → 新 UUID → SDK 创建全新会话；刷新 → 保留同一 UUID → 继续会话
   let sessionUserId = sessionStorage.getItem('coze_user_id');
   const isNewTab = !sessionUserId;
+  console.log('[kg-debug] isNewTab:', isNewTab, '| sessionUserId:', sessionUserId);
   if (isNewTab) {
     sessionUserId = crypto.randomUUID
       ? crypto.randomUUID()
@@ -154,6 +163,7 @@ async function initCoze() {
 
   try {
     watchForSdkBtn();   // 必须在构造之前设好，SDK 构造时同步插入容器
+    console.log('[kg-debug] SDK init with user_id:', sessionUserId);
     chatClient = new CozeWebSDK.WebChatClient({
       config: {
         bot_id: '7613708062620696585',
@@ -185,6 +195,14 @@ async function initCoze() {
     setTimeout(() => {
       openCozeChat();
     }, 300);
+    setTimeout(() => {
+      const lsAfter = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        lsAfter[k] = localStorage.getItem(k);
+      }
+      console.log('[kg-debug] localStorage AFTER SDK init (1s):', lsAfter);
+    }, 1000);
   } catch (e) {
     console.error('CozeWebSDK init error:', e);
     // 失败降级：显示启动卡片，按钮改为"重试连接"
@@ -200,12 +218,24 @@ async function initCoze() {
 
 // ── 清除 Coze SDK 缓存的 conversation（新标签页调用）──
 function _clearCozeConversationCache() {
-  // 精确删除 ByteDance WebSDK 安装 ID（Coze 服务端用此 key 关联会话）
+  console.log('[kg-debug] _clearCozeConversationCache called');
+  // Log ALL localStorage keys that look Coze-related
+  const cozeRelated = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (/coze|websdk|conversation|install|session|bot/i.test(k)) {
+      cozeRelated.push({ key: k, value: localStorage.getItem(k) });
+    }
+  }
+  console.log('[kg-debug] Coze-related localStorage keys found:', cozeRelated);
+
   const COZE_KEYS = ['websdk_ng_install_id'];
   COZE_KEYS.forEach(k => {
     if (localStorage.getItem(k) !== null) {
-      console.log('[kg] clearing Coze cache key:', k);
+      console.log('[kg-debug] CLEARING key:', k);
       localStorage.removeItem(k);
+    } else {
+      console.log('[kg-debug] key NOT present (already absent):', k);
     }
   });
 }
