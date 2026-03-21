@@ -128,50 +128,44 @@ async function initCoze() {
     return;
   }
 
-  // 从后端获取 token，PAT 不暴露在前端源码中
+  // 每个标签页用唯一 session_name 换取隔离的 JWT token
+  // sessionStorage 关闭标签后清空 → 新标签 = 新 session_name = 空会话
+  let sessionName = sessionStorage.getItem('coze_session_name');
+  if (!sessionName) {
+    sessionName = crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem('coze_session_name', sessionName);
+  }
+
   let token;
   try {
-    const res = await fetch('https://kg-plugin-production.up.railway.app/coze-token');
+    const res = await fetch(
+      `https://kg-plugin-production.up.railway.app/coze-session-token?session_name=${sessionName}`
+    );
     const data = await res.json();
     token = data.token;
   } catch (e) {
-    console.error('Failed to fetch Coze token:', e);
+    console.error('Failed to fetch Coze session token:', e);
     return;
-  }
-
-  // 每个标签页维护一个 conversation_id（sessionStorage 关闭标签后自动清空）
-  // 新标签 → 调接口创建空会话 → 全新对话；刷新 → 复用同一会话 → 继续对话
-  let conversationId = sessionStorage.getItem('coze_conversation_id');
-  console.log('[kg-debug] conversationId from sessionStorage:', conversationId);
-  if (!conversationId) {
-    try {
-      const cvResp = await fetch('https://kg-plugin-production.up.railway.app/coze-conversation/new', { method: 'POST' });
-      const cvData = await cvResp.json();
-      conversationId = cvData.conversation_id;
-      sessionStorage.setItem('coze_conversation_id', conversationId);
-      console.log('[kg-debug] new conversationId created:', conversationId);
-    } catch (e) {
-      console.error('Failed to create Coze conversation:', e);
-      // 降级：无 conversation_id，SDK 自动分配（可能续上旧会话）
-    }
   }
 
   try {
     watchForSdkBtn();   // 必须在构造之前设好，SDK 构造时同步插入容器
-    console.log('[kg-debug] SDK init with conversation_id:', conversationId);
     chatClient = new CozeWebSDK.WebChatClient({
       config: {
         bot_id: '7613708062620696585',
-        ...(conversationId ? { conversation_id: conversationId } : {}),
       },
       user: {
-        user_id: 'kg_student',
+        user_id: sessionName,
       },
       auth: {
         type: 'token',
         token: token,
         onRefreshToken: async () => {
-          const res = await fetch('https://kg-plugin-production.up.railway.app/coze-token');
+          const res = await fetch(
+            `https://kg-plugin-production.up.railway.app/coze-session-token?session_name=${sessionName}`
+          );
           const data = await res.json();
           return data.token;
         },

@@ -17,6 +17,7 @@ import json
 from datetime import datetime
 from dotenv import load_dotenv
 import httpx
+from cozepy import JWTOAuthApp, COZE_CN_BASE_URL
 
 load_dotenv()
 
@@ -370,34 +371,22 @@ async def get_logs(limit: int = 50):
 # Coze token 代理（无需鉴权，token 存环境变量）
 # ─────────────────────────────────────────
 
-@app.get("/coze-token")
-async def get_coze_token():
-    token = os.environ.get("COZE_PAT_TOKEN", "")
-    if not token:
-        raise HTTPException(status_code=503, detail="Coze token not configured")
-    return {"token": token}
-
-
-@app.post("/coze-conversation/new")
-async def new_coze_conversation():
-    """创建一个全新的空 Coze 会话，返回 conversation_id。新标签页调用此接口以重置聊天记录。"""
-    token = os.environ.get("COZE_PAT_TOKEN", "")
-    if not token:
-        raise HTTPException(status_code=503, detail="Coze token not configured")
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            "https://api.coze.cn/v1/conversation/create",
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            json={},
-            timeout=10,
-        )
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"Coze API error: {resp.text}")
-    data = resp.json()
-    conversation_id = data.get("data", {}).get("id")
-    if not conversation_id:
-        raise HTTPException(status_code=502, detail="No conversation_id in Coze response")
-    return {"conversation_id": conversation_id}
+@app.get("/coze-session-token")
+def get_coze_session_token(session_name: str):
+    """为每个标签页会话签发独立的 JWT OAuth token，实现会话隔离。"""
+    client_id = os.environ.get("COZE_CLIENT_ID", "")
+    private_key = os.environ.get("COZE_PRIVATE_KEY", "")
+    public_key_id = os.environ.get("COZE_PUBLIC_KEY_ID", "")
+    if not all([client_id, private_key, public_key_id]):
+        raise HTTPException(status_code=503, detail="Coze OAuth not configured")
+    jwt_app = JWTOAuthApp(
+        client_id=client_id,
+        private_key=private_key,
+        public_key_id=public_key_id,
+        base_url=COZE_CN_BASE_URL,
+    )
+    oauth_token = jwt_app.get_access_token(ttl=3600, session_name=session_name)
+    return {"token": oauth_token.access_token}
 
 
 # ─────────────────────────────────────────
