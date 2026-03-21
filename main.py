@@ -17,7 +17,8 @@ import json
 from datetime import datetime
 from dotenv import load_dotenv
 import httpx
-from cozepy import JWTOAuthApp, COZE_CN_BASE_URL
+import jwt as pyjwt
+import uuid
 
 load_dotenv()
 
@@ -372,21 +373,41 @@ async def get_logs(limit: int = 50):
 # ─────────────────────────────────────────
 
 @app.get("/coze-session-token")
-def get_coze_session_token(session_name: str):
-    """为每个标签页会话签发独立的 JWT OAuth token，实现会话隔离。"""
+async def get_coze_session_token(session_name: str):
+    """为每个标签页签发 JWT OAuth token，session_name 隔离会话历史。"""
     client_id = os.environ.get("COZE_CLIENT_ID", "")
     private_key = os.environ.get("COZE_PRIVATE_KEY", "")
     public_key_id = os.environ.get("COZE_PUBLIC_KEY_ID", "")
     if not all([client_id, private_key, public_key_id]):
         raise HTTPException(status_code=503, detail="Coze OAuth not configured")
-    jwt_app = JWTOAuthApp(
-        client_id=client_id,
-        private_key=private_key,
-        public_key_id=public_key_id,
-        base_url=COZE_CN_BASE_URL,
-    )
-    oauth_token = jwt_app.get_access_token(ttl=3600, session_name=session_name)
-    return {"token": oauth_token.access_token}
+
+    now = int(time.time())
+    payload = {
+        "iss": client_id,
+        "aud": "api.coze.cn",
+        "iat": now,
+        "exp": now + 3600,
+        "jti": str(uuid.uuid4()),
+        "session_name": session_name,
+    }
+    signed_jwt = pyjwt.encode(payload, private_key, algorithm="RS256", headers={"kid": public_key_id})
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://api.coze.cn/api/permission/oauth2/token",
+            data={
+                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                "duration_seconds": "3600",
+                "assertion": signed_jwt,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=10,
+        )
+    data = resp.json()
+    access_token = data.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=502, detail=f"Token exchange failed: {data}")
+    return {"token": access_token}
 
 
 # ─────────────────────────────────────────
