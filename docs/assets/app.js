@@ -128,14 +128,6 @@ async function initCoze() {
     return;
   }
 
-  // DEBUG: snapshot localStorage before any clearing
-  const lsSnapshot = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    lsSnapshot[k] = localStorage.getItem(k);
-  }
-  console.log('[kg-debug] localStorage ON LOAD:', lsSnapshot);
-
   // 从后端获取 token，PAT 不暴露在前端源码中
   let token;
   try {
@@ -147,29 +139,33 @@ async function initCoze() {
     return;
   }
 
-  // 每个标签页生成一次 user_id（sessionStorage 关闭标签后自动清空）
-  // 关闭标签重开 → 新 UUID → SDK 创建全新会话；刷新 → 保留同一 UUID → 继续会话
-  let sessionUserId = sessionStorage.getItem('coze_user_id');
-  const isNewTab = !sessionUserId;
-  console.log('[kg-debug] isNewTab:', isNewTab, '| sessionUserId:', sessionUserId);
-  if (isNewTab) {
-    sessionUserId = crypto.randomUUID
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2) + Date.now().toString(36);
-    sessionStorage.setItem('coze_user_id', sessionUserId);
-    // 新标签页：清除 SDK 缓存的 conversation_id，确保会话不延续
-    _clearCozeConversationCache();
+  // 每个标签页维护一个 conversation_id（sessionStorage 关闭标签后自动清空）
+  // 新标签 → 调接口创建空会话 → 全新对话；刷新 → 复用同一会话 → 继续对话
+  let conversationId = sessionStorage.getItem('coze_conversation_id');
+  console.log('[kg-debug] conversationId from sessionStorage:', conversationId);
+  if (!conversationId) {
+    try {
+      const cvResp = await fetch('https://kg-plugin-production.up.railway.app/coze-conversation/new', { method: 'POST' });
+      const cvData = await cvResp.json();
+      conversationId = cvData.conversation_id;
+      sessionStorage.setItem('coze_conversation_id', conversationId);
+      console.log('[kg-debug] new conversationId created:', conversationId);
+    } catch (e) {
+      console.error('Failed to create Coze conversation:', e);
+      // 降级：无 conversation_id，SDK 自动分配（可能续上旧会话）
+    }
   }
 
   try {
     watchForSdkBtn();   // 必须在构造之前设好，SDK 构造时同步插入容器
-    console.log('[kg-debug] SDK init with user_id:', sessionUserId);
+    console.log('[kg-debug] SDK init with conversation_id:', conversationId);
     chatClient = new CozeWebSDK.WebChatClient({
       config: {
         bot_id: '7613708062620696585',
+        ...(conversationId ? { conversation_id: conversationId } : {}),
       },
       user: {
-        user_id: sessionUserId,   // 绑定会话到标签页级别
+        user_id: 'kg_student',
       },
       auth: {
         type: 'token',
@@ -195,14 +191,6 @@ async function initCoze() {
     setTimeout(() => {
       openCozeChat();
     }, 300);
-    setTimeout(() => {
-      const lsAfter = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        lsAfter[k] = localStorage.getItem(k);
-      }
-      console.log('[kg-debug] localStorage AFTER SDK init (1s):', lsAfter);
-    }, 1000);
   } catch (e) {
     console.error('CozeWebSDK init error:', e);
     // 失败降级：显示启动卡片，按钮改为"重试连接"
@@ -216,29 +204,6 @@ async function initCoze() {
   }
 }
 
-// ── 清除 Coze SDK 缓存的 conversation（新标签页调用）──
-function _clearCozeConversationCache() {
-  console.log('[kg-debug] _clearCozeConversationCache called');
-  // Log ALL localStorage keys that look Coze-related
-  const cozeRelated = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (/coze|websdk|conversation|install|session|bot/i.test(k)) {
-      cozeRelated.push({ key: k, value: localStorage.getItem(k) });
-    }
-  }
-  console.log('[kg-debug] Coze-related localStorage keys found:', cozeRelated);
-
-  const COZE_KEYS = ['websdk_ng_install_id', 'SLARDARbot_studio_sdk'];
-  COZE_KEYS.forEach(k => {
-    if (localStorage.getItem(k) !== null) {
-      console.log('[kg-debug] CLEARING key:', k);
-      localStorage.removeItem(k);
-    } else {
-      console.log('[kg-debug] key NOT present (already absent):', k);
-    }
-  });
-}
 
 // ── 捕获 SDK 浮钮容器（监听 body 直接子节点）──
 function watchForSdkBtn() {

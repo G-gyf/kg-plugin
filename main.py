@@ -16,6 +16,7 @@ import time
 import json
 from datetime import datetime
 from dotenv import load_dotenv
+import httpx
 
 load_dotenv()
 
@@ -375,6 +376,28 @@ async def get_coze_token():
     if not token:
         raise HTTPException(status_code=503, detail="Coze token not configured")
     return {"token": token}
+
+
+@app.post("/coze-conversation/new")
+async def new_coze_conversation():
+    """创建一个全新的空 Coze 会话，返回 conversation_id。新标签页调用此接口以重置聊天记录。"""
+    token = os.environ.get("COZE_PAT_TOKEN", "")
+    if not token:
+        raise HTTPException(status_code=503, detail="Coze token not configured")
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://api.coze.cn/v1/conversation/create",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={},
+            timeout=10,
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Coze API error: {resp.text}")
+    data = resp.json()
+    conversation_id = data.get("data", {}).get("id")
+    if not conversation_id:
+        raise HTTPException(status_code=502, detail="No conversation_id in Coze response")
+    return {"conversation_id": conversation_id}
 
 
 # ─────────────────────────────────────────
