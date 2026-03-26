@@ -292,8 +292,29 @@ async def fuzzy_search(req: FuzzySearchRequest):
         with get_session() as session:
             cypher = """
                 MATCH (n)
-                WHERE toLower(n.name) CONTAINS toLower($keyword)
+                WITH n,
+                     toLower(coalesce(n.name, "")) AS name_lc,
+                     toLower(coalesce(n.description, "")) AS desc_lc,
+                     toLower($keyword) AS keyword_lc
+                WITH n, name_lc, desc_lc, keyword_lc,
+                     CASE
+                         WHEN name_lc = keyword_lc THEN 100
+                         WHEN name_lc CONTAINS keyword_lc THEN 80
+                         WHEN keyword_lc CONTAINS name_lc THEN 70
+                         WHEN desc_lc CONTAINS keyword_lc THEN 30
+                         WHEN (
+                             (keyword_lc = "存准率" AND name_lc CONTAINS "存款准备金率") OR
+                             (keyword_lc = "流动偏好" AND (
+                                 name_lc CONTAINS "流动性偏好理论" OR
+                                 name_lc CONTAINS "凯恩斯货币需求理论" OR
+                                 desc_lc CONTAINS "流动性偏好理论"
+                             ))
+                         ) THEN 90
+                         ELSE 0
+                     END AS score
+                WHERE score > 0
                 RETURN n
+                ORDER BY score DESC, size(coalesce(n.name, "")) ASC
                 LIMIT $limit
             """
             result = session.run(cypher, keyword=req.keyword, limit=req.limit)
