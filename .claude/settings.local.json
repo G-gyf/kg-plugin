@@ -11,7 +11,10 @@
       "WebFetch(domain:www.coze.com)",
       "WebFetch(domain:en.1991421.cn)",
       "WebSearch",
-      "WebFetch(domain:blog.csdn.net)"
+      "WebFetch(domain:blog.csdn.net)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

@@ -1018,6 +1018,7 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
             <tr><td><code>kg_result_global</code></td><td>String</td><td><code>""</code></td><td>每跳 dispatch 查询结果（JSON字符串）</td></tr>
             <tr><td><code>query_intent_global</code></td><td>String</td><td><code>""</code></td><td>查询意图，循环体内 Cypher 生成器读取</td></tr>
             <tr><td><code>user_query_global</code></td><td>String</td><td><code>""</code></td><td>原始问题，循环体内 LLM 节点读取</td></tr>
+            <tr><td><code>kg_found</code></td><td>String</td><td><code>"1"</code></td><td>每跳 AND 标志：全部查到为 <code>"1"</code>，任一跳未找到则永久置 <code>"0"</code></td></tr>
           </table>
         </div>
       </div>
@@ -1162,20 +1163,30 @@ curl -X POST https://kg-plugin-xxx.railway.app/query_entity \
       <!-- 序列化 Code Node（循环体内） -->
       <div class="node-config" style="margin-bottom:14px;">
         <div class="nc-header" style="color:var(--green);">⚡ 序列化 Code Node（循环体内，紧接 dispatch 后）</div>
-        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val">只引用 dispatch 输出的 <code>result_json</code>（String）字段——后端已将完整结果序列化为 JSON 字符串附在该字段，无需再接 entities/triples 等嵌套数组（Coze 无法可靠传递嵌套对象数组）</div></div>
-        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>kg_result</code>（String）</div></div>
+        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val">dispatch 输出的 <code>result_json</code>（String）；全局变量 <code>kg_found</code>（String）</div></div>
+        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>kg_result</code>（String）、<code>new_kg_found</code>（String）</div></div>
         <div class="nc-row"><div class="nc-key">代码</div><div class="nc-val">
           <div class="code-wrap" style="margin:0;">
             <div class="code-header"><span class="lang">PYTHON</span></div>
-            <pre><span class="kw">async def</span> <span class="fn">main</span>(result_json: str = <span class="str">"{}"</span>) -> dict:
-    <span class="kw">return</span> {<span class="str">"kg_result"</span>: result_json}</pre>
+            <pre><span class="kw">import</span> json
+
+<span class="kw">async def</span> <span class="fn">main</span>(result_json: str = <span class="str">"{}"</span>, kg_found: str = <span class="str">"1"</span>) -> dict:
+    <span class="kw">try</span>:
+        data = json.loads(result_json)
+        <span class="kw">if not</span> data.get(<span class="str">"found"</span>) <span class="kw">or not</span> data.get(<span class="str">"triples"</span>):
+            new_kg_found = <span class="str">"0"</span>
+        <span class="kw">else</span>:
+            new_kg_found = kg_found  <span class="cmt"># 当前成功，保持原值（可能已为 "0"）</span>
+    <span class="kw">except</span> Exception:
+        new_kg_found = <span class="str">"0"</span>
+    <span class="kw">return</span> {<span class="str">"kg_result"</span>: result_json, <span class="str">"new_kg_found"</span>: new_kg_found}</pre>
           </div>
         </div></div>
         <div class="callout warn" style="margin:8px 0 0 0;">
           <div class="icon">⚠️</div>
           <div class="body"><strong>为什么不直接接 entities/triples？</strong>Coze Plugin 对 OpenAPI schema 中 <code>items: {type: object}</code> 未定义属性的数组，传给 Code Node 时会丢弃内部数据（实测 entities 变为 <code>[]</code>）。后端 <code>/dispatch</code> 接口在返回原始字段的同时，额外附加 <code>result_json</code> 字符串字段绕开此限制。参见后端 main.py dispatch 函数末尾：<code>result["result_json"] = json.dumps(result, ensure_ascii=False)</code>。</div>
         </div>
-        <div class="nc-row"><div class="nc-key">变量赋值</div><div class="nc-val">此节点后加变量赋值：<code>kg_result_global</code> = 本节点输出 <code>kg_result</code></div></div>
+        <div class="nc-row"><div class="nc-key">变量赋值</div><div class="nc-val">此节点后加变量赋值：<code>kg_result_global</code> = 本节点输出 <code>kg_result</code>；<code>kg_found</code> = 本节点输出 <code>new_kg_found</code></div></div>
       </div>
 
       <!-- Node 4: 跳转评估（循环体内） -->
@@ -1412,20 +1423,18 @@ context_graph 中每个实体的 properties 包含：
       <p style="margin-top:16px;"><strong>节点 1 — KG 空值检测（Code 节点）</strong></p>
       <div class="node-config">
         <div class="nc-header"><span class="cyan">CODE</span>&nbsp;KG空值检测</div>
-        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val"><code>context_graph</code>（全局变量，String）</div></div>
-        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>kg_ok</code>（String）— <code>"1"</code> 充足 / <code>"0"</code> 不足</div></div>
+        <div class="nc-row"><div class="nc-key">输入变量</div><div class="nc-val"><code>kg_found</code>（全局变量，String）</div></div>
+        <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>kg_ok</code>（String）— <code>"1"</code> 全部查到 / <code>"0"</code> 存在未找到</div></div>
         <div class="nc-row"><div class="nc-key">语言</div><div class="nc-val">Python</div></div>
       </div>
       <div class="code-wrap">
         <div class="code-header"><span class="lang">PYTHON</span><span class="fname">KG空值检测 · 代码</span></div>
-        <pre><span class="kw">async def</span> <span class="fn">main</span>(context_graph: <span class="cls">str</span> = <span class="str">""</span>) -> <span class="cls">dict</span>:
-    text = <span class="cls">str</span>(context_graph).strip()
-    kg_ok = <span class="str">"1"</span> <span class="kw">if</span> <span class="fn">len</span>(text) >= <span class="num">80</span> <span class="kw">else</span> <span class="str">"0"</span>
-    <span class="kw">return</span> {<span class="str">"kg_ok"</span>: kg_ok}</pre>
+        <pre><span class="kw">async def</span> <span class="fn">main</span>(kg_found: <span class="cls">str</span> = <span class="str">"1"</span>) -> <span class="cls">dict</span>:
+    <span class="kw">return</span> {<span class="str">"kg_ok"</span>: kg_found}</pre>
       </div>
       <div class="callout tip" style="margin-top:4px;">
         <div class="icon">💡</div>
-        <div class="body">阈值 80 字符是经验值：KG 有效返回通常包含实体名、关系、描述，远超 80 字；空结果或"未找到"等占位符通常 &lt; 20 字。可按实际调整。</div>
+        <div class="body"><strong>AND 逻辑</strong>：<code>kg_found</code> 默认 <code>"1"</code>，每跳序列化节点检测 <code>result_json</code>——只要有一跳 <code>found=false</code> 或 <code>triples</code> 为空，就永久置 <code>"0"</code>。循环结束后此节点直接透传该值，保证任一实体未找到均走教材兜底。</div>
       </div>
 
       <p style="margin-top:16px;"><strong>节点 2 — KG 结果检查器（IF 节点）</strong></p>
@@ -1444,7 +1453,45 @@ context_graph 中每个实体的 properties 包含：
         <div class="nc-row"><div class="nc-key">相似度阈值</div><div class="nc-val">0.5</div></div>
         <div class="nc-row"><div class="nc-key">输出变量</div><div class="nc-val"><code>kb_chunks</code>（String）</div></div>
       </div>
-      <p style="font-size:11px;color:var(--text-mid);margin-top:6px;">KB 节点之后接<strong>变量赋值节点</strong>：将 <code>kb_chunks</code> 赋值给全局变量 <code>kb_result_global</code>，再连到 ⑥ 答案合成器。</p>
+      <p style="font-size:11px;color:var(--text-mid);margin-top:6px;">KB 节点之后<strong>先接 Code Node（安全提取）</strong>，再接变量赋值节点写入 <code>kb_result_global</code>，最后连到 ⑥ 答案合成器。</p>
+
+      <p style="margin-top:16px;"><strong>节点 3.5 — KB结果提取（Code Node）</strong></p>
+      <div class="node-config">
+        <div class="nc-header"><span class="cyan">&lt;/&gt;</span>&nbsp;KB结果提取</div>
+        <div class="nc-row"><div class="nc-key">输入参数</div><div class="nc-val"><code>output_list</code>（类型 <strong>Array</strong>）← 引用 <code>知识库检索.outputList</code></div></div>
+        <div class="nc-row"><div class="nc-key">输出</div><div class="nc-val"><code>kb_text</code>（String）</div></div>
+        <div class="nc-row"><div class="nc-key">代码</div><div class="nc-val">
+          <pre style="margin:4px 0;font-size:11px;background:#0d1117;padding:10px;border-radius:6px;overflow-x:auto;">import json
+
+async def main(output_list: list = []) -> dict:
+    # Coze 有时把 Array&lt;Object&gt; 整体或元素序列化为字符串传入
+    if isinstance(output_list, str):
+        try:
+            output_list = json.loads(output_list)
+        except:
+            return {"kb_text": ""}
+    if not output_list:
+        return {"kb_text": ""}
+    texts = []
+    for item in output_list:
+        if isinstance(item, str):
+            try:
+                item = json.loads(item)
+            except:
+                continue
+        if isinstance(item, dict):
+            val = item.get("output", "")
+            if val:
+                texts.append(val)
+    return {"kb_text": "\n".join(texts) if texts else ""}</pre>
+        </div></div>
+      </div>
+      <div class="callout warn" style="margin-top:8px;">
+        <div class="icon">⚠️</div>
+        <div class="body"><strong>为什么不能直接用变量赋值引用 <code>outputList[0].output</code>？</strong><br>
+        当知识库查无结果时 <code>outputList</code> 为空列表，Coze 变量赋值节点会因无法提取下标字段而报错：<code>[720712000] 无法提取字段 "output"</code>。Code Node 统一处理空列表与字符串序列化两种边界情况，保证始终返回合法字符串。</div>
+      </div>
+      <p style="font-size:11px;color:var(--text-mid);margin-top:8px;">Code Node 之后接<strong>变量赋值节点</strong>：将 <code>kb_text</code>（Code Node 输出）赋值给全局变量 <code>kb_result_global</code>，再连到 ⑥ 答案合成器。</p>
 
       <p style="margin-top:16px;"><strong>更新节点 ⑥ 答案合成器</strong></p>
       <p style="font-size:12px;color:var(--text-mid);margin-bottom:6px;">新增输入变量：<code>kb_result_global</code>（全局变量，String）。替换原有 Prompt 为：</p>
@@ -1478,7 +1525,7 @@ context_graph 中每个实体的 properties 包含：
         <tr><td>循环节点 → ⑥ 答案合成器</td><td>改为：循环节点 → <strong>KG空值检测</strong></td></tr>
         <tr><td>（新增）</td><td>KG空值检测 → KG结果检查器</td></tr>
         <tr><td>（新增）</td><td>KG结果检查器 [True] → ⑥ 答案合成器</td></tr>
-        <tr><td>（新增）</td><td>KG结果检查器 [Else] → 知识库检索⑥.5 → 变量赋值 → ⑥ 答案合成器</td></tr>
+        <tr><td>（新增）</td><td>KG结果检查器 [Else] → 知识库检索⑥.5 → <strong>KB结果提取（Code）</strong> → 变量赋值 → ⑥ 答案合成器</td></tr>
       </table>
 
       <div class="callout success" style="margin-top:12px;">
