@@ -19,6 +19,10 @@
   --ease: cubic-bezier(0.16,1,0.3,1); --ease-back: cubic-bezier(0.34,1.56,0.64,1);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06); --shadow-md: 0 4px 14px rgba(0,0,0,0.09);
   --shadow-lg: 0 8px 28px rgba(0,0,0,0.11); --dot-color: rgba(0,0,0,0.048);
+  --chat-height: calc(100vh - 180px);
+  --chat-min-height: 560px;
+  --chat-height-mobile: 520px;
+  --chat-height-mobile-sm: 440px;
 }
 
 [data-theme="dark"] {
@@ -733,8 +737,8 @@ body::before {
 }
 
 #chat-container {
-  height: calc(100vh - 230px);
-  min-height: 420px;
+  height: var(--chat-height);
+  min-height: var(--chat-min-height);
   width: 100%;
 }
 
@@ -745,8 +749,8 @@ body::before {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  height: calc(100vh - 230px);
-  min-height: 420px;
+  height: var(--chat-height);
+  min-height: var(--chat-min-height);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -949,7 +953,7 @@ body::before {
     overflow-y: visible;
   }
 
-  #chat-container, .chat-launch { height: 440px; min-height: 380px; }
+  #chat-container, .chat-launch { height: var(--chat-height-mobile); min-height: 420px; }
 
   .site-header {
     padding: 0 16px;
@@ -974,7 +978,7 @@ body::before {
 @media (max-width: 520px) {
   .topic-tags { gap: 5px; }
   .topic-tag  { font-size: 9px; padding: 3px 8px; }
-  #chat-container, .chat-launch { height: 380px; }
+  #chat-container, .chat-launch { height: var(--chat-height-mobile-sm); min-height: 400px; }
   .welcome-banner { font-size: 12px; }
   .action-tab { font-size: 10px; }
 }
