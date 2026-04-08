@@ -16,8 +16,8 @@ const EXAMPLE_QUESTIONS = [
   {
     topic: 'policy',
     label: '货币政策',
-    text: '央行降息对通货膨胀有什么影响？',
-    hint: '多跳推理：利率→投资→总需求→价格水平',
+    text: '公开市场业务是如何影响市场利率的?',
+    hint: null,
   },
   {
     topic: 'policy',
