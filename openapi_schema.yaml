@@ -1,12 +1,14 @@
 openapi: 3.0.3
 info:
   title: KG Query API
-  description: 知识图谱查询服务，供 Coze 智能体调用，支持实体查询、邻居查询、路径发现和模糊搜索。
-  version: 1.0.0
+  version: 1.1.0
+  description: >
+    Knowledge graph query service for Coze. Includes entity lookup,
+    path retrieval, fuzzy search, and mechanism-chain explanation.
 
 servers:
   - url: https://kg-plugin-production.up.railway.app
-    description: 生产服务器
+    description: Production service
 
 security:
   - ApiKeyAuth: []
@@ -17,33 +19,108 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+  schemas:
+    Node:
+      type: object
+      properties:
+        id:
+          type: string
+        labels:
+          type: array
+          items:
+            type: string
+        properties:
+          type: object
+          additionalProperties: true
+    Edge:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        source:
+          type: string
+        target:
+          type: string
+        properties:
+          type: object
+          additionalProperties: true
+    Triple:
+      type: object
+      properties:
+        start:
+          $ref: '#/components/schemas/Node'
+        relationship:
+          type: object
+          properties:
+            type:
+              type: string
+            properties:
+              type: object
+              additionalProperties: true
+        end:
+          $ref: '#/components/schemas/Node'
+    Path:
+      type: object
+      properties:
+        hops:
+          type: integer
+        mode:
+          type: string
+        readable:
+          type: string
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Node'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Edge'
+        relationships:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              properties:
+                type: object
+                additionalProperties: true
+    SupportingFact:
+      type: object
+      properties:
+        entity:
+          type: string
+        source:
+          type: string
+        field:
+          type: string
+        fact:
+          type: string
 
 paths:
-
   /query_entity:
     post:
       operationId: queryEntity
-      summary: 查询实体节点
-      description: 按实体名称查询知识图谱中的节点及其全部属性，支持精确和模糊匹配。
+      summary: Query entity
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - entity_name
+              required: [entity_name]
               properties:
                 entity_name:
                   type: string
-                  description: 要查询的实体名称，如"商品"、"货币"
                 fuzzy:
                   type: boolean
                   default: false
-                  description: 是否开启模糊匹配
       responses:
-        "200":
-          description: 查询成功
+        '200':
+          description: Entity query result
           content:
             application/json:
               schema:
@@ -51,69 +128,46 @@ paths:
                 properties:
                   found:
                     type: boolean
-                    description: 是否找到实体
                   count:
                     type: integer
-                    description: 找到的实体数量
-                  message:
+                  matched_entity:
                     type: string
-                    description: 未找到时的提示信息
+                  normalized_entity:
+                    type: string
                   entities:
                     type: array
-                    description: 实体列表
                     items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                        labels:
-                          type: array
-                          items:
-                            type: string
-                        properties:
-                          type: object
-                          properties:
-                            name:
-                              type: string
-                            description:
-                              type: string
-                            type:
-                              type: string
+                      $ref: '#/components/schemas/Node'
 
   /query_neighbors:
     post:
       operationId: queryNeighbors
-      summary: 查询实体的 N 跳邻居
-      description: 查询指定实体在知识图谱中的邻居节点和关系，支持深度 1~3 跳。
+      summary: Query multi-hop neighbors
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - entity_name
+              required: [entity_name]
               properties:
                 entity_name:
                   type: string
-                  description: 起始实体名称
                 depth:
                   type: integer
                   default: 1
                   minimum: 1
                   maximum: 3
-                  description: 查询深度，1=直接邻居，2=两跳，3=三跳
                 rel_type:
                   type: string
-                  description: 关系类型过滤，如"包含"、"影响"，不填则查所有关系
                 limit:
                   type: integer
                   default: 20
+                  minimum: 1
                   maximum: 50
-                  description: 返回三元组数量上限
       responses:
-        "200":
-          description: 查询成功
+        '200':
+          description: Neighbor query result
           content:
             application/json:
               schema:
@@ -123,89 +177,47 @@ paths:
                     type: boolean
                   count:
                     type: integer
+                  path_count:
+                    type: integer
                   source_entity:
+                    type: string
+                  matched_entity:
                     type: string
                   depth:
                     type: integer
+                  paths:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Path'
                   triples:
                     type: array
-                    description: 三元组列表
                     items:
-                      type: object
-                      properties:
-                        start:
-                          type: object
-                          properties:
-                            id:
-                              type: string
-                            labels:
-                              type: array
-                              items:
-                                type: string
-                            properties:
-                              type: object
-                              properties:
-                                name:
-                                  type: string
-                                description:
-                                  type: string
-                        relationship:
-                          type: object
-                          properties:
-                            type:
-                              type: string
-                            properties:
-                              type: object
-                              properties:
-                                evidence:
-                                  type: string
-                        end:
-                          type: object
-                          properties:
-                            id:
-                              type: string
-                            labels:
-                              type: array
-                              items:
-                                type: string
-                            properties:
-                              type: object
-                              properties:
-                                name:
-                                  type: string
-                                description:
-                                  type: string
+                      $ref: '#/components/schemas/Triple'
 
   /find_path:
     post:
       operationId: findPath
-      summary: 查找两实体间最短路径
-      description: 查找知识图谱中两个实体之间的最短连接路径，用于多跳推理的路径展示。
+      summary: Find shortest path with directed-first fallback
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - start_entity
-                - end_entity
+              required: [start_entity, end_entity]
               properties:
                 start_entity:
                   type: string
-                  description: 起始实体名称
                 end_entity:
                   type: string
-                  description: 目标实体名称
                 max_hops:
                   type: integer
                   default: 4
                   minimum: 1
                   maximum: 6
-                  description: 允许的最大跳数
       responses:
-        "200":
-          description: 查询成功
+        '200':
+          description: Path query result
           content:
             application/json:
               schema:
@@ -215,76 +227,41 @@ paths:
                     type: boolean
                   count:
                     type: integer
+                  mode:
+                    type: string
+                  matched_start_entity:
+                    type: string
+                  matched_end_entity:
+                    type: string
                   message:
                     type: string
                   paths:
                     type: array
-                    description: 路径列表
                     items:
-                      type: object
-                      properties:
-                        hops:
-                          type: integer
-                          description: 跳数
-                        readable:
-                          type: string
-                          description: 人类可读路径，如"商品 → 货币 → 市场经济"
-                        nodes:
-                          type: array
-                          items:
-                            type: object
-                            properties:
-                              id:
-                                type: string
-                              labels:
-                                type: array
-                                items:
-                                  type: string
-                              properties:
-                                type: object
-                                properties:
-                                  name:
-                                    type: string
-                                  description:
-                                    type: string
-                        relationships:
-                          type: array
-                          items:
-                            type: object
-                            properties:
-                              type:
-                                type: string
-                              properties:
-                                type: object
-                                properties:
-                                  evidence:
-                                    type: string
+                      $ref: '#/components/schemas/Path'
 
   /fuzzy_search:
     post:
       operationId: fuzzySearch
-      summary: 实体模糊搜索
-      description: 用关键词模糊搜索实体，用于实体消歧，当用户输入名称不精确时获取候选列表。
+      summary: Fuzzy search entities
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - keyword
+              required: [keyword]
               properties:
                 keyword:
                   type: string
-                  description: 模糊搜索关键词
                 limit:
                   type: integer
                   default: 10
+                  minimum: 1
                   maximum: 20
-                  description: 返回候选数量
       responses:
-        "200":
-          description: 搜索成功
+        '200':
+          description: Fuzzy search result
           content:
             application/json:
               schema:
@@ -296,87 +273,50 @@ paths:
                     type: integer
                   keyword:
                     type: string
+                  normalized_keyword:
+                    type: string
+                  best_match:
+                    type: string
                   candidates:
                     type: array
-                    description: 候选实体列表
                     items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                          description: 节点元素 ID
-                        labels:
-                          type: array
-                          items:
-                            type: string
-                        properties:
-                          type: object
-                          description: 节点所有属性（含 name、description 及中文属性字段）
-                          properties:
-                            name:
-                              type: string
-                              description: 实体名称
-                            description:
-                              type: string
-                              description: 实体基础描述
-                            attributes:
-                              type: string
-                              description: JSON 字符串，内含详细属性（特点、功能/作用、定义、类型、例子、背景/原因、统计口径、计算公式等）
+                      $ref: '#/components/schemas/Node'
 
-  /dispatch:
+  /explain_mechanism:
     post:
-      operationId: dispatch
-      summary: 统一分发查询
-      description: 统一分发接口，由 action 字段路由到对应查询逻辑，供 Coze Workflow 单节点调用。
+      operationId: explainMechanism
+      summary: Retrieve a teaching-oriented mechanism chain
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - action
+              required: [question]
               properties:
-                action:
+                question:
                   type: string
-                  description: "操作名称：queryEntity | queryNeighbors | findPath | fuzzySearch"
-                entity_name:
-                  type: string
-                  description: 实体名称（queryEntity / queryNeighbors 时使用）
-                fuzzy:
-                  type: boolean
-                  default: false
-                  description: 是否模糊匹配
-                depth:
-                  type: integer
-                  default: 1
-                  minimum: 1
-                  maximum: 3
-                  description: 查询深度（queryNeighbors 时使用）
-                limit:
-                  type: integer
-                  default: 20
-                  minimum: 1
-                  maximum: 50
-                  description: 返回结果上限
                 start_entity:
                   type: string
-                  description: 起始实体（findPath 时使用）
-                end_entity:
+                target_entity:
                   type: string
-                  description: 目标实体（findPath 时使用）
+                bridge_candidates:
+                  type: array
+                  items:
+                    type: string
                 max_hops:
                   type: integer
-                  default: 4
-                  minimum: 1
+                  default: 5
+                  minimum: 2
                   maximum: 6
-                  description: 最大跳数（findPath 时使用）
-                keyword:
-                  type: string
-                  description: 模糊搜索关键词（fuzzySearch 时使用）
+                limit:
+                  type: integer
+                  default: 30
+                  minimum: 5
+                  maximum: 50
       responses:
-        "200":
-          description: 查询成功
+        '200':
+          description: Mechanism explanation result
           content:
             application/json:
               schema:
@@ -384,39 +324,112 @@ paths:
                 properties:
                   found:
                     type: boolean
-                    description: 是否找到结果
-                  count:
-                    type: integer
-                    description: 结果数量
-                  message:
+                  question_type:
                     type: string
-                    description: 提示信息
-                  entities:
-                    type: array
-                    description: 实体列表（queryEntity 返回）
-                    items:
-                      type: object
-                  triples:
-                    type: array
-                    description: 三元组列表（queryNeighbors 返回）
-                    items:
-                      type: object
-                  source_entity:
+                  start_entity:
                     type: string
-                    description: 查询的源实体名称
+                  target_entity:
+                    type: string
+                  focus_entities:
+                    type: array
+                    items:
+                      type: string
+                  core_entities:
+                    type: array
+                    items:
+                      type: string
+                  resolved_bridges:
+                    type: array
+                    items:
+                      type: string
+                  missing_bridges:
+                    type: array
+                    items:
+                      type: string
+                  recommended_next_entity:
+                    type: string
+                  path_complete:
+                    type: boolean
+                  retrieval_query:
+                    type: string
+                  current_mechanism_chain:
+                    type: string
+                  answer_outline:
+                    type: array
+                    items:
+                      type: string
+                  evidence_chains:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Path'
+                  supporting_facts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SupportingFact'
+
+  /dispatch:
+    post:
+      operationId: dispatch
+      summary: Unified Coze dispatch endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  description: queryEntity | queryNeighbors | findPath | fuzzySearch | explainMechanism
+                entity_name:
+                  type: string
+                fuzzy:
+                  type: boolean
+                  default: false
+                depth:
+                  type: integer
+                  default: 1
+                rel_type:
+                  type: string
+                limit:
+                  type: integer
+                  default: 20
+                start_entity:
+                  type: string
+                end_entity:
+                  type: string
+                max_hops:
+                  type: integer
+                  default: 4
+                keyword:
+                  type: string
+                question:
+                  type: string
+                bridge_candidates:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Routed result with JSON string mirror
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
                   result_json:
                     type: string
-                    description: 完整结果的 JSON 字符串（包含 entities/triples 完整数据），供 Code Node 直接使用
+                    description: Full response serialized as JSON for Coze code nodes
 
   /health:
     get:
       operationId: healthCheck
-      summary: 服务健康检查
-      description: 检查服务和 Neo4j 连接状态，无需鉴权。
+      summary: Health check
       security: []
       responses:
-        "200":
-          description: 状态正常
+        '200':
+          description: Service and Neo4j status
           content:
             application/json:
               schema:
@@ -424,10 +437,7 @@ paths:
                 properties:
                   status:
                     type: string
-                    description: 服务状态，ok 或 error
                   neo4j:
                     type: string
-                    description: Neo4j 连接状态
                   timestamp:
                     type: string
-                    description: 当前时间

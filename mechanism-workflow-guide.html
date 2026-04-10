@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mechanism Workflow Guide</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --paper: #fffaf1;
+      --ink: #1f2a2e;
+      --muted: #5c696d;
+      --line: #dbcdb5;
+      --accent: #b24c2d;
+      --accent-soft: rgba(178, 76, 45, 0.12);
+      --teal: #235b63;
+      --shadow: 0 18px 40px rgba(33, 39, 45, 0.08);
+      --mono: "Consolas", "SFMono-Regular", monospace;
+      --sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(178,76,45,0.08), transparent 28%),
+        linear-gradient(180deg, #f8f2e8 0%, var(--bg) 100%);
+    }
+    .shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+      display: grid;
+      gap: 20px;
+    }
+    .hero, .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -60px;
+      top: -60px;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(35,91,99,0.14), rgba(178,76,45,0.08));
+    }
+    h1, h2, h3 { margin: 0 0 12px; }
+    h1 { font-size: 34px; letter-spacing: 0.02em; }
+    h2 { font-size: 22px; }
+    .sub {
+      max-width: 780px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+    .grid {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: 280px 1fr;
+    }
+    .sidebar, .main {
+      display: grid;
+      gap: 20px;
+    }
+    .card { padding: 22px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(35,91,99,0.18);
+      background: rgba(35,91,99,0.08);
+      color: var(--teal);
+      font-size: 12px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    .list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .list li {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.7);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    .steps {
+      counter-reset: step;
+      display: grid;
+      gap: 14px;
+    }
+    .step {
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,250,241,0.9));
+    }
+    .step h3::before {
+      counter-increment: step;
+      content: counter(step, decimal-leading-zero) ". ";
+      color: var(--accent);
+    }
+    .muted { color: var(--muted); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th { color: var(--teal); }
+    pre {
+      margin: 0;
+      padding: 16px;
+      overflow: auto;
+      border-radius: 16px;
+      border: 1px solid rgba(35,91,99,0.16);
+      background: #1b2528;
+      color: #edf4f4;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .two-col {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .note {
+      padding: 14px 16px;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      border-radius: 14px;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+    @media (max-width: 900px) {
+      .grid, .two-col { grid-template-columns: 1fr; }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div id="hero-tags"></div>
+      <h1 id="title"></h1>
+      <p class="sub" id="summary"></p>
+    </section>
+
+    <div class="grid">
+      <aside class="sidebar">
+        <section class="card">
+          <h2 id="overview-title"></h2>
+          <ul class="list" id="overview-list"></ul>
+        </section>
+        <section class="card">
+          <h2 id="files-title"></h2>
+          <ul class="list" id="files-list"></ul>
+        </section>
+      </aside>
+
+      <main class="main">
+        <section class="card">
+          <h2 id="backend-title"></h2>
+          <div class="steps" id="backend-steps"></div>
+        </section>
+
+        <section class="card">
+          <h2 id="workflow-title"></h2>
+          <div class="note" id="workflow-note"></div>
+          <div class="steps" id="workflow-steps"></div>
+        </section>
+
+        <section class="card">
+          <h2 id="vars-title"></h2>
+          <table>
+            <thead>
+              <tr>
+                <th id="vars-col-1"></th>
+                <th id="vars-col-2"></th>
+                <th id="vars-col-3"></th>
+              </tr>
+            </thead>
+            <tbody id="vars-body"></tbody>
+          </table>
+        </section>
+
+        <section class="card">
+          <h2 id="prompts-title"></h2>
+          <div class="two-col">
+            <div>
+              <h3 id="planner-title"></h3>
+              <pre id="planner-prompt"></pre>
+            </div>
+            <div>
+              <h3 id="evaluator-title"></h3>
+              <pre id="evaluator-prompt"></pre>
+            </div>
+          </div>
+          <div style="margin-top:18px;">
+            <h3 id="answer-title"></h3>
+            <pre id="answer-prompt"></pre>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 id="json-title"></h2>
+          <div class="two-col">
+            <div>
+              <h3 id="dispatch-title"></h3>
+              <pre id="dispatch-json"></pre>
+            </div>
+            <div>
+              <h3 id="response-title"></h3>
+              <pre id="response-json"></pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 id="test-title"></h2>
+          <ul class="list" id="test-list"></ul>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const text = {
+      title: "\u673a\u5236\u7c7b\u95ee\u7b54\u5de5\u4f5c\u6d41\u6267\u884c\u6307\u5357",
+      summary: "\u8fd9\u4efd\u9875\u9762\u914d\u5957\u5f53\u524d\u5df2\u7ecf\u5b9e\u88c5\u7684 `kg_api` \u540e\u7aef\u3002\u76ee\u6807\u662f\u8ba9\u4f60\u4e0d\u6539 Neo4j \u56fe\u6570\u636e\uff0c\u53ea\u901a\u8fc7 Coze \u5de5\u4f5c\u6d41 + \u540e\u7aef\u7f16\u6392\uff0c\u628a\u201c\u4e3a\u4ec0\u4e48 / \u5982\u4f55 / \u901a\u8fc7 / \u4f20\u5bfc\u201d\u7c7b\u95ee\u9898\u4ece\u77ed\u8def\u5f84\u7b54\u6848\u63d0\u5347\u4e3a\u6559\u5b66\u578b\u673a\u5236\u94fe\u56de\u7b54\u3002",
+      overviewTitle: "\u4f60\u73b0\u5728\u5df2\u6709\u4ec0\u4e48",
+      overview: [
+        "\u540e\u7aef\u5df2\u65b0\u589e `/explain_mechanism`\uff0c\u4e5f\u652f\u6301 `/dispatch` \u7684 `action=explainMechanism`\u3002",
+        "`/query_neighbors` \u73b0\u5728\u8fd4\u56de `paths + edges + readable`\uff0c\u4e0d\u518d\u628a\u591a\u8df3\u8def\u5f84\u538b\u6241\u3002",
+        "`/find_path` \u5df2\u6539\u4e3a\u201c\u6709\u5411\u4f18\u5148\uff0c\u65e0\u7ed3\u679c\u518d\u56de\u9000\u65e0\u5411\u201d\u3002",
+        "`/fuzzy_search` \u5df2\u63a5\u5165 alias \u5c55\u5f00\uff0c\u8fd0\u884c\u65f6\u4f1a\u63d0\u9ad8\u201c\u5b58\u6b3e\u51c6\u5907\u91d1\u7387 / \u6cd5\u5b9a\u5b58\u6b3e\u51c6\u5907\u91d1\u7387\u201d\u7b49\u95ee\u6cd5\u7684\u547d\u4e2d\u7387\u3002",
+        "\u5de5\u4f5c\u6d41\u914d\u7f6e\u6587\u4ef6\u4e0d\u5728\u4ed3\u5e93\u91cc\uff0c\u6240\u4ee5 Coze \u90e8\u5206\u9700\u8981\u4f60\u5728\u7ebf\u4e0a\u624b\u52a8\u642d\u5efa\u3002"
+      ],
+      filesTitle: "\u672c\u6b21\u4f18\u5148\u4f7f\u7528\u7684\u6587\u4ef6",
+      files: [
+        "`main.py` \u6539\u4e86\u6838\u5fc3 API \u903b\u8f91\u3001\u7f16\u6392\u3001alias \u5f52\u4e00\u3001\u8def\u5f84\u5e8f\u5217\u5316\u3002",
+        "`openapi_schema.yaml` \u5df2\u66f4\u65b0\uff0cCoze \u91cd\u65b0\u5bfc\u5165\u540e\u5c31\u80fd\u770b\u5230\u65b0\u63a5\u53e3\u5b57\u6bb5\u3002",
+        "`mechanism-workflow-guide.html` \u662f\u4f60\u73b0\u5728\u770b\u7684\u6267\u884c\u624b\u518c\u3002"
+      ],
+      backendTitle: "\u540e\u7aef\u843d\u5730\u987a\u5e8f",
+      backendSteps: [
+        ["\u91cd\u65b0\u90e8\u7f72\u670d\u52a1", "\u628a `kg_api` \u91cd\u65b0\u90e8\u7f72\u5230 Railway \u6216\u4f60\u73b0\u5728\u7684\u90e8\u7f72\u5e73\u53f0\uff0c\u5148\u7528 `/health` \u786e\u8ba4 FastAPI \u80fd\u8fde\u4e0a Neo4j\u3002"],
+        ["\u91cd\u65b0\u5bfc\u5165 OpenAPI", "\u5728 Coze Plugin \u91cc\u91cd\u65b0\u5bfc\u5165 `openapi_schema.yaml`\uff0c\u8ba9 Plugin \u77e5\u9053 `/explain_mechanism` \u548c\u65b0\u7684 `dispatch` \u8bf7\u6c42\u5f62\u72b6\u3002"],
+        ["\u5355\u72ec\u6d4b\u63d2\u4ef6", "\u5148\u76f4\u63a5\u5728 Coze \u63d2\u4ef6\u8c03\u8bd5\u9762\u677f\u8c03 `dispatch` \u7684 `explainMechanism`\uff0c\u786e\u8ba4 `resolved_bridges` \u548c `answer_outline` \u4e0d\u4e3a\u7a7a\u3002"],
+        ["\u518d\u63a5\u5de5\u4f5c\u6d41", "\u63d2\u4ef6\u5355\u72ec\u6d4b\u901a\u4e4b\u540e\uff0c\u518d\u628a\u5de5\u4f5c\u6d41\u7684\u95ee\u9898\u5206\u7c7b\u3001\u8def\u7531\u3001\u8865\u6865\u8282\u70b9\u5faa\u73af\u63a5\u4e0a\u53bb\u3002"]
+      ],
+      workflowTitle: "\u5728 Coze \u91cc\u7684\u642d\u5efa\u987a\u5e8f",
+      workflowNote: "\u5efa\u8bae\u5148\u505a MVP\uff1a\u95ee\u9898\u5206\u7c7b -> \u673a\u5236\u9898\u8def\u7531 -> dispatch explainMechanism -> \u7b54\u6848\u5408\u6210\u3002\u7b49\u8fd9\u6761\u94fe\u8def\u7a33\u4e86\uff0c\u518d\u52a0\u201c\u8def\u5f84\u8bc4\u4f30\u5668 + \u8865\u6865\u8282\u70b9\u5faa\u73af\u201d\u3002",
+      workflowSteps: [
+        ["\u65b0\u5efa\u5168\u5c40\u53d8\u91cf", "\u81f3\u5c11\u65b0\u5efa `question_type`\u3001`start_entity_global`\u3001`target_entity_global`\u3001`bridge_candidates_global`\u3001`resolved_bridges_global`\u3001`missing_bridges_global`\u3001`context_graph`\u3001`kg_result_global`\u3001`hop_count`\u3001`max_hops`\u3002"],
+        ["\u95ee\u9898\u89c4\u5212\u5668", "\u7528 LLM / Code Node \u628a\u95ee\u9898\u8f93\u51fa\u6210 JSON\uff0c\u81f3\u5c11\u5305\u542b `question_type`\u3001`start_entity`\u3001`target_entity`\u3001`bridge_candidates`\u3001`rewritten_query`\u3002"],
+        ["\u673a\u5236\u9898\u8def\u7531", "\u7528 IF \u8282\u70b9\u5224\u65ad `question_type == mechanism_chain`\u3002\u662f\u5219\u8d70\u673a\u5236\u5206\u652f\uff0c\u5426\u5219\u8d70\u4f60\u73b0\u6709\u7684\u5b9a\u4e49 / \u6bd4\u8f83 / \u666e\u901a\u56fe\u8c31\u5206\u652f\u3002"],
+        ["\u673a\u5236\u68c0\u7d22\u4e3b\u8c03\u7528", "\u5728 Plugin Node \u91cc\u8c03 `/dispatch`\uff0c\u8bf7\u6c42\u4f53\u7528 `action=explainMechanism`\u3002\u53c2\u8003\u4e0b\u9762\u7684 JSON \u6a21\u677f\uff0c\u4f20\u5165\u539f\u95ee\u9898\u3001start/target \u548c bridge_candidates\u3002"],
+        ["\u8def\u5f84\u8bc4\u4f30\u5668", "\u5982\u679c `path_complete=false`\uff0c\u5c31\u8ba9\u8bc4\u4f30\u5668\u8bfb `missing_bridges`\u548c `recommended_next_entity`\uff0c\u5224\u65ad\u662f\u5426\u7ee7\u7eed\u8865\u67e5\u3002"],
+        ["\u8865\u6865\u8282\u70b9\u5faa\u73af", "\u9700\u8981\u8865\u67e5\u65f6\uff0c\u4f18\u5148\u67e5 `queryEntity(next_entity)`\uff0c\u518d\u67e5 `queryNeighbors(next_entity, depth=1~2)`\uff0c\u7ed3\u679c\u5e76\u5165 `context_graph`\uff0c\u7136\u540e\u56de\u5230\u8bc4\u4f30\u5668\u3002"],
+        ["\u7b54\u6848\u5408\u6210", "\u7b54\u6848 Prompt \u8981\u5f3a\u5236\u6309\u201c\u8d77\u70b9 -> \u4e2d\u95f4\u673a\u5236 -> \u7ec8\u70b9\u201d\u5199\uff0c\u4e0d\u80fd\u53ea\u7ed9\u4e00\u6761\u6700\u77ed\u8def\u5f84\u5f0f\u603b\u7ed3\u3002"]
+      ],
+      varsTitle: "\u5de5\u4f5c\u6d41\u5168\u5c40\u53d8\u91cf",
+      varsCol1: "\u53d8\u91cf",
+      varsCol2: "\u9ed8\u8ba4\u503c",
+      varsCol3: "\u7528\u9014",
+      vars: [
+        ["question_type", "\"\"", "\u6807\u8bb0 mechanism_chain / definition / comparison / path_finding"],
+        ["start_entity_global", "\"\"", "\u673a\u5236\u9898\u7684\u8d77\u70b9\u5b9e\u4f53"],
+        ["target_entity_global", "\"\"", "\u673a\u5236\u9898\u7684\u7ec8\u70b9\u5b9e\u4f53"],
+        ["bridge_candidates_global", "\"[]\"", "\u8865\u94fe\u6761\u65f6\u4f18\u5148\u67e5\u8be2\u7684\u6865\u8282\u70b9"],
+        ["resolved_bridges_global", "\"[]\"", "\u672c\u8f6e\u5df2\u7ecf\u547d\u4e2d\u7684\u6865\u8282\u70b9"],
+        ["missing_bridges_global", "\"[]\"", "\u8bc4\u4f30\u5668\u8ba4\u4e3a\u8fd8\u7f3a\u7684\u6865\u8282\u70b9"],
+        ["context_graph", "\"\"", "\u7d2f\u79ef\u8def\u5f84\u3001\u5c5e\u6027\u4e8b\u5b9e\u3001\u4e2d\u95f4\u7ed3\u8bba"],
+        ["kg_result_global", "\"\"", "\u4e0a\u4e00\u8df3 dispatch \u7684 result_json"],
+        ["hop_count", "0", "\u8865\u67e5\u6b21\u6570\u8ba1\u6570\u5668"],
+        ["max_hops", "4", "\u5faa\u73af\u622a\u6b62\u6761\u4ef6"]
+      ],
+      promptsTitle: "\u53ef\u76f4\u63a5\u590d\u5236\u7684 Prompt",
+      plannerTitle: "\u8282\u70b9 1 \u95ee\u9898\u89c4\u5212\u5668",
+      evaluatorTitle: "\u8282\u70b9 2 \u8def\u5f84\u8bc4\u4f30\u5668",
+      answerTitle: "\u8282\u70b9 3 \u7b54\u6848\u5408\u6210\u5668",
+      plannerPrompt: " \u4f60\u662f\u91d1\u878d\u5b66\u77e5\u8bc6\u56fe\u8c31\u5de5\u4f5c\u6d41\u4e2d\u7684\u95ee\u9898\u89c4\u5212\u5668\u3002\\n\\n\u8bf7\u8f93\u51fa\u7eaf JSON\uff0c\u4e0d\u8981\u8f93\u51fa\u4efb\u4f55\u89e3\u91ca\u3002\\n\\n\u8f93\u51fa\u683c\u5f0f\uff1a\\n{\\n  \"question_type\": \"mechanism_chain | definition | comparison | path_finding\",\\n  \"start_entity\": \"\",\\n  \"target_entity\": \"\",\\n  \"bridge_candidates\": [],\\n  \"preferred_action\": \"explainMechanism | findPath | queryEntity | queryNeighbors | fuzzySearch\",\\n  \"rewritten_query\": \"\"\\n}\\n\\n\u89c4\u5219\uff1a\\n1. \u5982\u679c\u95ee\u9898\u5305\u542b\u201c\u4e3a\u4ec0\u4e48\u3001\u5982\u4f55\u3001\u901a\u8fc7\u3001\u8fdb\u800c\u3001\u5bfc\u81f4\u3001\u5f71\u54cd\u3001\u4f20\u5bfc\u3001\u673a\u5236\u201d\uff0c\u4e14\u8bed\u4e49\u4e0a\u5b58\u5728 X \u5f71\u54cd Y\uff0c\u5219 question_type = mechanism_chain\u3002\\n2. mechanism_chain \u5fc5\u987b\u8bc6\u522b start_entity \u548c target_entity\u3002\\n3. \u5bf9\u8d27\u5e01\u653f\u7b56\u673a\u5236\u9898\uff0c\u4f18\u5148\u8003\u8651\uff1a\u53ef\u8d37\u8d44\u91d1\u3001\u8d85\u989d\u51c6\u5907\u91d1\u3001\u4fe1\u8d37\u89c4\u6a21\u3001\u4fe1\u7528\u521b\u9020\u3001\u8d27\u5e01\u4e58\u6570\u3001\u6d3e\u751f\u5b58\u6b3e\u3002\\n4. \u5982\u679c start_entity \u548c target_entity \u90fd\u660e\u786e\uff0cpreferred_action \u4f18\u5148 explainMechanism\u3002\\n5. rewritten_query \u8981\u628a\u7528\u6237\u7701\u7565\u7684\u4e2d\u95f4\u673a\u5236\u8865\u8fdb\u6765\u3002",
+      evaluatorPrompt: "\u4f60\u662f\u91d1\u878d\u5b66\u673a\u5236\u8def\u5f84\u8bc4\u4f30\u5668\u3002\\n\\n\u7528\u6237\u95ee\u9898\uff1a{{user_query_global}}\\n\u8d77\u70b9\u5b9e\u4f53\uff1a{{start_entity_global}}\\n\u7ec8\u70b9\u5b9e\u4f53\uff1a{{target_entity_global}}\\n\u5019\u9009\u6865\u8282\u70b9\uff1a{{bridge_candidates_global}}\\n\u5f53\u524d\u56fe\u8c31\u7ed3\u679c\uff1a{{kg_result_global}}\\n\u5df2\u6709\u4e0a\u4e0b\u6587\uff1a{{context_graph}}\\n\\n\u8bf7\u8f93\u51fa\u7eaf JSON\uff1a\\n{\\n  \"path_complete\": true,\\n  \"resolved_bridges\": [],\\n  \"missing_bridges\": [],\\n  \"next_action\": \"queryEntity | queryNeighbors | findPath | stop\",\\n  \"next_entity\": \"\",\\n  \"updated_context\": \"\"\\n}\\n\\n\u89c4\u5219\uff1a\\n1. \u53ea\u6709\u5f62\u6210\u201c\u8d77\u70b9 -> \u4e2d\u95f4\u673a\u5236 -> \u7ec8\u70b9\u201d\u94fe\u6761\u65f6\uff0cpath_complete \u624d\u80fd\u4e3a true\u3002\\n2. \u5982\u679c\u53ea\u6709\u8d77\u70b9\u5230\u7ec8\u70b9\u7684\u7b80\u5316\u7ed3\u8bba\uff0cpath_complete \u5fc5\u987b\u4e3a false\u3002\\n3. \u4e2d\u95f4\u73af\u8282\u4f18\u5148\u8003\u8651\uff1a\u51c6\u5907\u91d1\u5360\u7528\u3001\u8d85\u989d\u51c6\u5907\u91d1\u3001\u53ef\u8d37\u8d44\u91d1\u3001\u4fe1\u8d37\u89c4\u6a21\u3001\u4fe1\u7528\u521b\u9020\u3001\u8d27\u5e01\u4e58\u6570\u3002",
+      answerPrompt: "\u4f60\u662f\u91d1\u878d\u5b66\u77e5\u8bc6\u56fe\u8c31\u95ee\u7b54\u52a9\u624b\u3002\\n\\n\u7528\u6237\u95ee\u9898\uff1a{{user_query_global}}\\n\u8d77\u70b9\u5b9e\u4f53\uff1a{{start_entity_global}}\\n\u7ec8\u70b9\u5b9e\u4f53\uff1a{{target_entity_global}}\\n\u5df2\u6062\u590d\u6865\u8282\u70b9\uff1a{{resolved_bridges_global}}\\n\u63a8\u7406\u4e0a\u4e0b\u6587\uff1a{{context_graph}}\\n\\n\u8981\u6c42\uff1a\\n1. \u5bf9\u673a\u5236\u9898\uff0c\u5148\u56de\u7b54\u201c\u8d77\u70b9\u5982\u4f55\u901a\u8fc7\u4e2d\u95f4\u673a\u5236\u5f71\u54cd\u7ec8\u70b9\u201d\u3002\\n2. \u5982\u679c\u94fe\u6761\u5b8c\u6574\uff0c\u6309\u201c\u8d77\u70b9 -> \u4e2d\u95f4\u673a\u5236 -> \u7ec8\u70b9\u201d\u987a\u5e8f\u4f5c\u7b54\u3002\\n3. \u5982\u679c\u94fe\u6761\u4e0d\u5b8c\u6574\uff0c\u5fc5\u987b\u660e\u786e\u5199\u51fa\u201c\u76ee\u524d\u6062\u590d\u5230\u54ea\u4e00\u6b65\u201d\u3002\\n4. \u4e0d\u5141\u8bb8\u53ea\u7ed9\u4e00\u53e5\u201c\u901a\u8fc7\u8d27\u5e01\u4e58\u6570\u5f71\u54cd\u8d27\u5e01\u4f9b\u7ed9\u201d\u7684\u538b\u7f29\u7ed3\u8bba\u3002\\n5. \u7ed3\u5c3e\u9644\u4e0a\u63a8\u7406\u8def\u5f84\u3002",
+      jsonTitle: "Plugin \u8bf7\u6c42 / \u54cd\u5e94\u793a\u4f8b",
+      dispatchTitle: "`/dispatch` \u8bf7\u6c42\u4f53",
+      responseTitle: "\u671f\u671b\u54cd\u5e94\u8981\u70b9",
+      dispatchJson: "{\n  \"action\": \"explainMechanism\",\n  \"question\": \"\u4e2d\u592e\u94f6\u884c\u4e3a\u4ec0\u4e48\u80fd\u901a\u8fc7\u5b58\u6b3e\u51c6\u5907\u91d1\u7387\u5f71\u54cd\u8d27\u5e01\u4f9b\u7ed9\uff1f\",\n  \"start_entity\": \"\u4e2d\u592e\u94f6\u884c\",\n  \"end_entity\": \"\u8d27\u5e01\u4f9b\u7ed9\",\n  \"bridge_candidates\": [\n    \"\u53ef\u8d37\u8d44\u91d1\",\n    \"\u8d85\u989d\u51c6\u5907\u91d1\",\n    \"\u4fe1\u8d37\u89c4\u6a21\",\n    \"\u4fe1\u7528\u521b\u9020\",\n    \"\u8d27\u5e01\u4e58\u6570\"\n  ],\n  \"max_hops\": 5,\n  \"limit\": 20\n}",
+      responseJson: "{\n  \"question_type\": \"mechanism_chain\",\n  \"resolved_bridges\": [\"...\"] ,\n  \"missing_bridges\": [\"...\"],\n  \"path_complete\": false,\n  \"answer_outline\": [\"...\"],\n  \"evidence_chains\": [\n    {\n      \"readable\": \"A -> B -> C -> D\",\n      \"nodes\": [...],\n      \"edges\": [...]\n    }\n  ],\n  \"supporting_facts\": [\n    {\n      \"entity\": \"...\",\n      \"field\": \"\u4f20\u5bfc\u673a\u5236\",\n      \"fact\": \"...\"\n    }\n  ],\n  \"result_json\": \"{...}\"\n}",
+      testTitle: "\u9a8c\u6536\u987a\u5e8f",
+      tests: [
+        "\u5148\u6d4b\uff1a`\u4e2d\u592e\u94f6\u884c\u4e3a\u4ec0\u4e48\u80fd\u901a\u8fc7\u5b58\u6b3e\u51c6\u5907\u91d1\u7387\u5f71\u54cd\u8d27\u5e01\u4f9b\u7ed9\uff1f`\uff0c\u89c2\u5bdf `resolved_bridges` \u91cc\u81f3\u5c11\u6709 2 \u4e2a\u4e2d\u95f4\u8282\u70b9\u3002",
+        "\u518d\u6d4b\uff1a`\u4e2d\u592e\u94f6\u884c\u4e3a\u4ec0\u4e48\u80fd\u901a\u8fc7\u5b58\u6b3e\u51c6\u5907\u91d1\u7387\u5f71\u54cd\u5546\u4e1a\u94f6\u884c\u653e\u8d37\u89c4\u6a21\u8fdb\u800c\u5f71\u54cd\u8d27\u5e01\u4f9b\u7ed9\uff1f`\uff0c\u786e\u8ba4\u56de\u7b54\u6bd4\u7b80\u95ee\u66f4\u957f\uff0c\u4f46\u4e24\u8005\u7ed3\u6784\u4e00\u81f4\u3002",
+        "\u56de\u5f52\u6d4b\uff1a`\u4ec0\u4e48\u662f\u8d27\u5e01\u4e58\u6570\uff1f`\uff0c\u786e\u8ba4\u4ecd\u7136\u8d70\u4f60\u65e7\u7684\u5b9a\u4e49\u9898\u5206\u652f\u3002",
+        "\u6700\u540e\u6d4b Coze \u4e0a\u5c42\u56de\u7b54\uff0c\u68c0\u67e5\u662f\u5426\u8fd8\u4f1a\u88ab\u201c\u6700\u77ed\u8def\u5f84\u201d\u538b\u56de\u53ea\u5269\u4e00\u53e5\u8bdd\u3002"
+      ]
+    };
+
+    const fillList = (id, items) => {
+      const root = document.getElementById(id);
+      items.forEach(item => {
+        const li = document.createElement("li");
+        li.innerHTML = item;
+        root.appendChild(li);
+      });
+    };
+
+    const fillSteps = (id, steps) => {
+      const root = document.getElementById(id);
+      steps.forEach(([title, body]) => {
+        const box = document.createElement("div");
+        box.className = "step";
+        box.innerHTML = `<h3>${title}</h3><p class="muted">${body}</p>`;
+        root.appendChild(box);
+      });
+    };
+
+    const heroTags = document.getElementById("hero-tags");
+    ["Coze Workflow", "KG API 1.1", "Mechanism Chain"].forEach(tag => {
+      const span = document.createElement("span");
+      span.className = "pill";
+      span.textContent = tag;
+      heroTags.appendChild(span);
+    });
+
+    document.getElementById("title").textContent = text.title;
+    document.getElementById("summary").textContent = text.summary;
+    document.getElementById("overview-title").textContent = text.overviewTitle;
+    document.getElementById("files-title").textContent = text.filesTitle;
+    document.getElementById("backend-title").textContent = text.backendTitle;
+    document.getElementById("workflow-title").textContent = text.workflowTitle;
+    document.getElementById("workflow-note").textContent = text.workflowNote;
+    document.getElementById("vars-title").textContent = text.varsTitle;
+    document.getElementById("vars-col-1").textContent = text.varsCol1;
+    document.getElementById("vars-col-2").textContent = text.varsCol2;
+    document.getElementById("vars-col-3").textContent = text.varsCol3;
+    document.getElementById("prompts-title").textContent = text.promptsTitle;
+    document.getElementById("planner-title").textContent = text.plannerTitle;
+    document.getElementById("evaluator-title").textContent = text.evaluatorTitle;
+    document.getElementById("answer-title").textContent = text.answerTitle;
+    document.getElementById("json-title").textContent = text.jsonTitle;
+    document.getElementById("dispatch-title").textContent = text.dispatchTitle;
+    document.getElementById("response-title").textContent = text.responseTitle;
+    document.getElementById("test-title").textContent = text.testTitle;
+
+    fillList("overview-list", text.overview);
+    fillList("files-list", text.files);
+    fillSteps("backend-steps", text.backendSteps);
+    fillSteps("workflow-steps", text.workflowSteps);
+    fillList("test-list", text.tests);
+
+    const varsBody = document.getElementById("vars-body");
+    text.vars.forEach(([name, value, desc]) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td><code>${name}</code></td><td><code>${value}</code></td><td>${desc}</td>`;
+      varsBody.appendChild(row);
+    });
+
+    document.getElementById("planner-prompt").textContent = text.plannerPrompt;
+    document.getElementById("evaluator-prompt").textContent = text.evaluatorPrompt;
+    document.getElementById("answer-prompt").textContent = text.answerPrompt;
+    document.getElementById("dispatch-json").textContent = text.dispatchJson;
+    document.getElementById("response-json").textContent = text.responseJson;
+  </script>
+</body>
+</html>
